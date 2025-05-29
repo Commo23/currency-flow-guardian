@@ -1,8 +1,7 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Settings, Users, Shield, Globe, Bell } from "lucide-react";
+import { Settings as SettingsIcon, Users, Shield, Globe, Bell } from "lucide-react";
 
 export default function Settings() {
   const { t } = useLanguage();
@@ -198,7 +197,7 @@ export default function Settings() {
       <Card className="finance-card">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
-            <Settings className="h-5 w-5 text-gray-600" />
+            <SettingsIcon className="h-5 w-5 text-gray-600" />
             <span>Paramètres généraux</span>
           </CardTitle>
         </CardHeader>
