@@ -8,6 +8,11 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import Dashboard from "./pages/Dashboard";
+import Exposures from "./pages/Exposures";
+import Scenarios from "./pages/Scenarios";
+import Hedging from "./pages/Hedging";
+import Reporting from "./pages/Reporting";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,11 +33,11 @@ const App = () => (
                 </div>
                 <Routes>
                   <Route path="/" element={<Dashboard />} />
-                  <Route path="/exposures" element={<Dashboard />} />
-                  <Route path="/scenarios" element={<Dashboard />} />
-                  <Route path="/hedging" element={<Dashboard />} />
-                  <Route path="/reporting" element={<Dashboard />} />
-                  <Route path="/settings" element={<Dashboard />} />
+                  <Route path="/exposures" element={<Exposures />} />
+                  <Route path="/scenarios" element={<Scenarios />} />
+                  <Route path="/hedging" element={<Hedging />} />
+                  <Route path="/reporting" element={<Reporting />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </main>

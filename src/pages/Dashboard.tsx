@@ -133,7 +133,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg">
               <div>
                 <p className="font-medium text-amber-800">Volatilité EUR/USD élevée</p>
-                <p className="text-sm text-amber-600">Volatilité 30j > 15% - Recommandation: augmenter la couverture</p>
+                <p className="text-sm text-amber-600">Volatilité 30j &gt; 15% - Recommandation: augmenter la couverture</p>
               </div>
               <span className="text-xs text-amber-600">Il y a 2h</span>
             </div>
