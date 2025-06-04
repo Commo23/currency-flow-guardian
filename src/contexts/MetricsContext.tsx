@@ -30,19 +30,19 @@ interface MetricsProviderProps {
 
 export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) => {
   const { exposures } = useExposures();
-  const { instruments } = useHedging();
+  const { hedgingInstruments } = useHedging();
 
   const metrics = useMemo(() => {
-    console.log('Recalculating metrics with exposures:', exposures.length, 'instruments:', instruments.length);
+    console.log('Recalculating metrics with exposures:', exposures.length, 'instruments:', hedgingInstruments.length);
     
     // Calculate total exposure (absolute values)
     const totalExposure = exposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
     
     // Calculate total notional for instruments
-    const totalNotional = instruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
+    const totalNotional = hedgingInstruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
     
     // Calculate total MTM for instruments
-    const totalMTM = instruments.reduce((sum, inst) => {
+    const totalMTM = hedgingInstruments.reduce((sum, inst) => {
       const mtm = calculateMTM(inst);
       console.log(`MTM for ${inst.type} ${inst.currency}:`, mtm);
       return sum + mtm;
@@ -57,7 +57,7 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
       return sum + (diffDays * Math.abs(exp.amount));
     }, 0);
     
-    const instrumentMaturitySum = instruments.reduce((sum, inst) => {
+    const instrumentMaturitySum = hedgingInstruments.reduce((sum, inst) => {
       const instDate = new Date(inst.maturity);
       const diffTime = instDate.getTime() - now.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -96,7 +96,7 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
       hedgeRatio,
       unrealizedPnL
     };
-  }, [exposures, instruments]);
+  }, [exposures, hedgingInstruments]);
 
   return (
     <MetricsContext.Provider value={metrics}>

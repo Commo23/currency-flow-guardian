@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -12,13 +11,13 @@ import { FileText, Download, Calendar, BarChart } from "lucide-react";
 export default function Reporting() {
   const { t, language } = useLanguage();
   const { exposures } = useExposures();
-  const { instruments } = useHedging();
+  const { hedgingInstruments } = useHedging();
   const metrics = useMetrics();
 
   const generateReport = (reportType: string) => {
     const reportData = {
       exposures,
-      instruments,
+      instruments: hedgingInstruments,
       metrics,
       reportType,
       language
