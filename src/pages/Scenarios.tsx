@@ -1,60 +1,88 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Play, BarChart3, AlertTriangle } from "lucide-react";
+import { useExposures } from "@/contexts/ExposureContext";
+import { ScenarioDialog } from "@/components/ScenarioDialog";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TrendingUp, DollarSign, AlertTriangle, BarChart3 } from "lucide-react";
 
 export default function Scenarios() {
   const { t } = useLanguage();
+  const { exposures } = useExposures();
+  const [scenarios, setScenarios] = useState([
+    {
+      id: 1,
+      name: "Scenario de base",
+      type: "Actuel",
+      impact: 0,
+      date: new Date().toISOString().split('T')[0]
+    }
+  ]);
 
-  const scenarios = [
-    { name: 'EUR/USD +5%', impact: '+125K €', risk: 'Faible' },
-    { name: 'EUR/USD -10%', impact: '-280K €', risk: 'Élevé' },
-    { name: 'GBP/EUR +3%', impact: '+45K €', risk: 'Faible' },
-    { name: 'Volatilité extrême', impact: '-450K €', risk: 'Critique' },
-  ];
+  const [chartData, setChartData] = useState([
+    { scenario: 'Base', impact: 0 },
+    { scenario: 'USD +5%', impact: -42000 },
+    { scenario: 'USD +10%', impact: -85000 },
+    { scenario: 'GBP -5%', impact: 25000 },
+  ]);
+
+  const runScenario = (scenario: any) => {
+    // Simulation simple de l'impact
+    const usdExposures = exposures.filter(exp => exp.currency === 'USD');
+    const gbpExposures = exposures.filter(exp => exp.currency === 'GBP');
+    
+    let impact = 0;
+    if (scenario.rates.EURUSD !== 1.0856) {
+      const usdImpact = usdExposures.reduce((sum, exp) => sum + exp.amount, 0);
+      impact += usdImpact * ((scenario.rates.EURUSD - 1.0856) / 1.0856);
+    }
+    
+    if (scenario.rates.EURGBP !== 0.8434) {
+      const gbpImpact = gbpExposures.reduce((sum, exp) => sum + exp.amount, 0);
+      impact += gbpImpact * ((scenario.rates.EURGBP - 0.8434) / 0.8434);
+    }
+
+    const newScenario = {
+      id: scenarios.length + 1,
+      name: scenario.name,
+      type: scenario.type,
+      impact: Math.round(impact),
+      date: new Date().toISOString().split('T')[0]
+    };
+
+    setScenarios(prev => [...prev, newScenario]);
+    setChartData(prev => [...prev, { scenario: scenario.name, impact: Math.round(impact) }]);
+  };
+
+  const totalExposure = exposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
+  const worstCaseScenario = scenarios.reduce((worst, scenario) => 
+    scenario.impact < worst.impact ? scenario : worst, scenarios[0]);
 
   return (
     <div className="p-6 space-y-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('scenarios')}</h1>
-          <p className="text-gray-600 mt-1">Simulation et analyse de scénarios</p>
+          <p className="text-gray-600 mt-1">Simulation de scénarios de change</p>
         </div>
-        <Button className="bg-primary text-white">
-          <Play className="h-4 w-4 mr-2" />
-          Nouveau scénario
-        </Button>
+        <ScenarioDialog onRunScenario={runScenario} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="finance-card">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5 text-primary" />
-              <span>Scénarios de stress</span>
+              <DollarSign className="h-5 w-5 text-blue-600" />
+              <span>Exposition analysée</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {scenarios.map((scenario, index) => (
-                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{scenario.name}</p>
-                    <p className={`text-sm font-semibold ${scenario.impact.includes('+') ? 'text-green-600' : 'text-red-600'}`}>
-                      Impact: {scenario.impact}
-                    </p>
-                  </div>
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    scenario.risk === 'Faible' ? 'bg-green-100 text-green-800' :
-                    scenario.risk === 'Élevé' ? 'bg-red-100 text-red-800' :
-                    'bg-red-200 text-red-900'
-                  }`}>
-                    {scenario.risk}
-                  </span>
-                </div>
-              ))}
+            <div className="text-2xl font-bold text-gray-900">
+              {(totalExposure / 1000000).toFixed(2)}M €
             </div>
+            <p className="text-sm text-gray-500">{exposures.length} expositions</p>
           </CardContent>
         </Card>
 
@@ -62,61 +90,79 @@ export default function Scenarios() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <AlertTriangle className="h-5 w-5 text-amber-600" />
-              <span>Recommandations</span>
+              <span>Pire scénario</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="font-medium text-amber-800">USD - Exposition critique</p>
-                <p className="text-sm text-amber-600">Recommandé: Couvrir 80% de l'exposition USD d'ici 15 jours</p>
-              </div>
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="font-medium text-blue-800">GBP - Opportunité</p>
-                <p className="text-sm text-blue-600">Conditions favorables pour étendre la couverture GBP</p>
-              </div>
-              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="font-medium text-green-800">EUR - Position stable</p>
-                <p className="text-sm text-green-600">Maintenir la stratégie actuelle</p>
-              </div>
+            <div className={`text-2xl font-bold ${worstCaseScenario.impact >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {worstCaseScenario.impact >= 0 ? '+' : ''}{(worstCaseScenario.impact / 1000).toFixed(0)}K €
             </div>
+            <p className="text-sm text-gray-500">{worstCaseScenario.name}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="finance-card">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <BarChart3 className="h-5 w-5 text-green-600" />
+              <span>Scénarios testés</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">{scenarios.length}</div>
+            <p className="text-sm text-gray-500">Simulations réalisées</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="finance-card">
-        <CardHeader>
-          <CardTitle>Simulateur de scénarios</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div>
-              <label className="block text-sm font-medium mb-2">Devise de base</label>
-              <select className="w-full p-2 border rounded-md">
-                <option>EUR</option>
-                <option>USD</option>
-                <option>GBP</option>
-              </select>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="finance-card">
+          <CardHeader>
+            <CardTitle>Impact des scénarios</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="scenario" stroke="#64748b" fontSize={12} />
+                  <YAxis stroke="#64748b" fontSize={12} tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`} />
+                  <Tooltip 
+                    formatter={(value: number) => [`${(value / 1000).toFixed(0)}K €`, 'Impact']}
+                    contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                  />
+                  <Bar 
+                    dataKey="impact" 
+                    fill={(entry: any) => entry.impact >= 0 ? '#16a34a' : '#dc2626'}
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Variation (%)</label>
-              <input type="number" className="w-full p-2 border rounded-md" placeholder="5" />
+          </CardContent>
+        </Card>
+
+        <Card className="finance-card">
+          <CardHeader>
+            <CardTitle>Historique des simulations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {scenarios.map((scenario) => (
+                <div key={scenario.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{scenario.name}</p>
+                    <p className="text-sm text-gray-500">{scenario.type} - {new Date(scenario.date).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                  <div className={`font-semibold ${scenario.impact >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {scenario.impact >= 0 ? '+' : ''}{(scenario.impact / 1000).toFixed(0)}K €
+                  </div>
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">Horizon temporel</label>
-              <select className="w-full p-2 border rounded-md">
-                <option>7 jours</option>
-                <option>30 jours</option>
-                <option>90 jours</option>
-              </select>
-            </div>
-          </div>
-          <Button className="bg-primary text-white">
-            <Play className="h-4 w-4 mr-2" />
-            Lancer la simulation
-          </Button>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
