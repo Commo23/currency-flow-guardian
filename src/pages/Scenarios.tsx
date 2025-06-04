@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useExposures } from "@/contexts/ExposureContext";
 import { ScenarioDialog } from "@/components/ScenarioDialog";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { TrendingUp, DollarSign, AlertTriangle, BarChart3 } from "lucide-react";
 
 export default function Scenarios() {
@@ -131,11 +131,11 @@ export default function Scenarios() {
                     formatter={(value: number) => [`${(value / 1000).toFixed(0)}K €`, 'Impact']}
                     contentStyle={{ backgroundColor: 'white', border: '1px solid #e2e8f0', borderRadius: '8px' }}
                   />
-                  <Bar 
-                    dataKey="impact" 
-                    fill={(entry: any) => entry.impact >= 0 ? '#16a34a' : '#dc2626'}
-                    radius={[4, 4, 0, 0]}
-                  />
+                  <Bar dataKey="impact" radius={[4, 4, 0, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.impact >= 0 ? '#16a34a' : '#dc2626'} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -1,14 +1,16 @@
-
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useHedging } from "@/contexts/HedgingContext";
 import { AddHedgingDialog } from "@/components/AddHedgingDialog";
-import { Shield, TrendingUp, Calendar, Edit, Trash2 } from "lucide-react";
+import { GreeksDisplay } from "@/components/GreeksDisplay";
+import { Shield, TrendingUp, Calendar, Edit, Trash2, Eye } from "lucide-react";
 
 export default function Hedging() {
   const { t } = useLanguage();
   const { hedgingInstruments, addHedgingInstrument, deleteHedgingInstrument } = useHedging();
+  const [selectedInstrument, setSelectedInstrument] = useState<number | null>(null);
 
   const totalNotional = hedgingInstruments.reduce((sum, inst) => sum + inst.amount, 0);
   const totalMTM = hedgingInstruments.reduce((sum, inst) => sum + inst.mtm, 0);
@@ -73,74 +75,93 @@ export default function Hedging() {
         </Card>
       </div>
 
-      <Card className="finance-card">
-        <CardHeader>
-          <CardTitle>Instruments de couverture</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-3">Type</th>
-                  <th className="text-left p-3">Devise</th>
-                  <th className="text-left p-3">Notionnel</th>
-                  <th className="text-left p-3">Taux/Strike</th>
-                  <th className="text-left p-3">Échéance</th>
-                  <th className="text-left p-3">Prime</th>
-                  <th className="text-left p-3">MTM</th>
-                  <th className="text-left p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hedgingInstruments.map((instrument) => (
-                  <tr key={instrument.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        instrument.type === 'Forward' ? 'bg-blue-100 text-blue-800' :
-                        instrument.type.includes('Option') ? 'bg-purple-100 text-purple-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {instrument.type}
-                      </span>
-                    </td>
-                    <td className="p-3 font-medium">{instrument.currency}</td>
-                    <td className="p-3">{(instrument.amount / 1000).toFixed(0)}K</td>
-                    <td className="p-3 font-mono text-sm">{instrument.rate.toFixed(4)}</td>
-                    <td className="p-3">{new Date(instrument.maturity).toLocaleDateString('fr-FR')}</td>
-                    <td className="p-3">
-                      {instrument.premium ? `${(instrument.premium / 1000).toFixed(1)}K €` : '-'}
-                    </td>
-                    <td className={`p-3 font-semibold ${instrument.mtm >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {instrument.mtm >= 0 ? '+' : ''}{(instrument.mtm / 1000).toFixed(1)}K €
-                    </td>
-                    <td className="p-3">
-                      <div className="flex space-x-1">
-                        <Button variant="outline" size="sm">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => deleteHedgingInstrument(instrument.id)}
-                          className="text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {hedgingInstruments.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                Aucun instrument de couverture. Ajoutez-en un pour commencer.
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2">
+          <Card className="finance-card">
+            <CardHeader>
+              <CardTitle>Instruments de couverture</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-3">Type</th>
+                      <th className="text-left p-3">Devise</th>
+                      <th className="text-left p-3">Notionnel</th>
+                      <th className="text-left p-3">Taux/Strike</th>
+                      <th className="text-left p-3">Échéance</th>
+                      <th className="text-left p-3">Prime</th>
+                      <th className="text-left p-3">MTM</th>
+                      <th className="text-left p-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {hedgingInstruments.map((instrument) => (
+                      <tr key={instrument.id} className={`border-b hover:bg-gray-50 ${selectedInstrument === instrument.id ? 'bg-blue-50' : ''}`}>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            instrument.type === 'Forward' ? 'bg-blue-100 text-blue-800' :
+                            instrument.type.includes('Option') ? 'bg-purple-100 text-purple-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {instrument.type}
+                          </span>
+                        </td>
+                        <td className="p-3 font-medium">{instrument.currency}</td>
+                        <td className="p-3">{(instrument.amount / 1000).toFixed(0)}K</td>
+                        <td className="p-3 font-mono text-sm">{instrument.rate.toFixed(4)}</td>
+                        <td className="p-3">{new Date(instrument.maturity).toLocaleDateString('fr-FR')}</td>
+                        <td className="p-3">
+                          {instrument.premium ? `${(instrument.premium / 1000).toFixed(1)}K €` : '-'}
+                        </td>
+                        <td className={`p-3 font-semibold ${instrument.mtm >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {instrument.mtm >= 0 ? '+' : ''}{(instrument.mtm / 1000).toFixed(1)}K €
+                        </td>
+                        <td className="p-3">
+                          <div className="flex space-x-1">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => setSelectedInstrument(selectedInstrument === instrument.id ? null : instrument.id)}
+                            >
+                              <Eye className="h-3 w-3" />
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => deleteHedgingInstrument(instrument.id)}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {hedgingInstruments.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    Aucun instrument de couverture. Ajoutez-en un pour commencer.
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="xl:col-span-1">
+          {selectedInstrument && (
+            <GreeksDisplay 
+              instrument={hedgingInstruments.find(inst => inst.id === selectedInstrument)} 
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

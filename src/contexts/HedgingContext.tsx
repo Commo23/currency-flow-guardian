@@ -1,5 +1,6 @@
 
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import { calculateMTM } from '@/utils/financialCalculations';
 
 interface HedgingInstrument {
   id: number;
@@ -40,11 +41,6 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
     { id: 3, type: 'Forward', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-04-10', mtm: 1800 },
   ]);
 
-  const calculateMTM = (instrument: Omit<HedgingInstrument, 'id' | 'mtm'>) => {
-    // Simulation simple du MTM
-    return Math.random() * 10000 - 5000;
-  };
-
   const addHedgingInstrument = (instrumentData: Omit<HedgingInstrument, 'id' | 'mtm'>) => {
     const newInstrument = {
       ...instrumentData,
@@ -55,9 +51,16 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
   };
 
   const updateHedgingInstrument = (id: number, instrumentData: Partial<HedgingInstrument>) => {
-    setHedgingInstruments(prev => prev.map(inst => 
-      inst.id === id ? { ...inst, ...instrumentData } : inst
-    ));
+    setHedgingInstruments(prev => prev.map(inst => {
+      if (inst.id === id) {
+        const updatedInst = { ...inst, ...instrumentData };
+        return {
+          ...updatedInst,
+          mtm: calculateMTM(updatedInst)
+        };
+      }
+      return inst;
+    }));
   };
 
   const deleteHedgingInstrument = (id: number) => {
