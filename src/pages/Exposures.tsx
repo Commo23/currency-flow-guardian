@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -8,7 +7,7 @@ import { DollarSign, Calendar, TrendingUp, Edit, Trash2 } from "lucide-react";
 
 export default function Exposures() {
   const { t } = useLanguage();
-  const { exposures, deleteExposure } = useExposures();
+  const { exposures, addExposure, deleteExposure } = useExposures();
 
   const totalExposure = exposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
   const exposures30Days = exposures.filter(exp => {
@@ -36,7 +35,7 @@ export default function Exposures() {
           <h1 className="text-3xl font-bold text-gray-900">{t('exposures')}</h1>
           <p className="text-gray-600 mt-1">Gestion des expositions de change</p>
         </div>
-        <AddExposureDialog onAddExposure={() => {}} />
+        <AddExposureDialog onAddExposure={addExposure} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

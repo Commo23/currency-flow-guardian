@@ -39,6 +39,7 @@ export function AddExposureDialog({ onAddExposure }: AddExposureDialogProps) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.currency && formData.amount && formData.date && formData.type) {
+      console.log('Adding exposure:', formData);
       onAddExposure({
         currency: formData.currency,
         amount: parseFloat(formData.amount),
@@ -57,19 +58,19 @@ export function AddExposureDialog({ onAddExposure }: AddExposureDialogProps) {
       const reader = new FileReader();
       reader.onload = (event) => {
         const csv = event.target?.result as string;
-        const lines = csv.split('\n');
-        const header = lines[0].split(',');
+        const lines = csv.split('\n').filter(line => line.trim());
         
-        // Expected CSV format: Currency,Amount,Date,Type,Description
+        // Skip header line
         for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(',');
+          const values = lines[i].split(',').map(v => v.trim());
           if (values.length >= 4 && values[0] && values[1] && values[2] && values[3]) {
+            console.log('Adding CSV exposure:', values);
             onAddExposure({
-              currency: values[0].trim(),
-              amount: parseFloat(values[1].trim()),
-              date: values[2].trim(),
-              type: values[3].trim(),
-              description: values[4]?.trim() || ''
+              currency: values[0],
+              amount: parseFloat(values[1]),
+              date: values[2],
+              type: values[3],
+              description: values[4] || ''
             });
           }
         }
@@ -110,6 +111,7 @@ export function AddExposureDialog({ onAddExposure }: AddExposureDialogProps) {
           <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
             <strong>Format CSV attendu:</strong><br/>
             Currency,Amount,Date,Type,Description<br/>
+            <strong>Exemple:</strong><br/>
             EUR,1200000,2024-02-15,Encaissement,Vente export<br/>
             USD,-800000,2024-02-20,Décaissement,Achat matières
           </div>

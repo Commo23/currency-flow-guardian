@@ -169,15 +169,29 @@ export function calculateMTM(
   const riskFreeRate = 0.02; // 2% taux sans risque
   const volatility = 0.15; // 15% volatilité par défaut
 
+  console.log('Calculating MTM for:', instrument.type, instrument.currency, 'TTM:', timeToExpiry);
+
   switch (instrument.type) {
     case 'Forward':
       const forwardRate = currentRates[`EUR${instrument.currency}`] || 1;
-      return instrument.amount * (forwardRate - instrument.rate);
+      const mtmForward = instrument.amount * (forwardRate - instrument.rate);
+      console.log('Forward MTM:', mtmForward, 'Current rate:', forwardRate, 'Strike:', instrument.rate);
+      return mtmForward;
 
     case 'Option Call':
     case 'Option Put':
       const spotRate = currentRates[`EUR${instrument.currency}`] || 1;
       const isCall = instrument.type === 'Option Call';
+      
+      if (timeToExpiry <= 0) {
+        // Option expirée - valeur intrinsèque
+        const intrinsicValue = Math.max(0, isCall ? 
+          (spotRate - instrument.rate) * instrument.amount : 
+          (instrument.rate - spotRate) * instrument.amount);
+        const premiumPaid = instrument.premium || 0;
+        console.log('Expired option MTM:', intrinsicValue - premiumPaid);
+        return intrinsicValue - premiumPaid;
+      }
       
       const optionValue = blackScholesPrice(
         spotRate,
@@ -189,14 +203,19 @@ export function calculateMTM(
       );
       
       const premiumPaid = instrument.premium || 0;
-      return (optionValue * instrument.amount) - premiumPaid;
+      const mtmOption = (optionValue * instrument.amount) - premiumPaid;
+      console.log('Option MTM:', mtmOption, 'Option value:', optionValue, 'Premium paid:', premiumPaid);
+      return mtmOption;
 
     case 'Swap':
       // Calcul simplifié pour un swap
       const swapRate = currentRates[`EUR${instrument.currency}`] || 1;
-      return instrument.amount * (swapRate - instrument.rate) * timeToExpiry;
+      const mtmSwap = instrument.amount * (swapRate - instrument.rate) * timeToExpiry;
+      console.log('Swap MTM:', mtmSwap);
+      return mtmSwap;
 
     default:
+      console.log('Unknown instrument type, using random MTM');
       return Math.random() * 10000 - 5000; // Simulation pour autres instruments
   }
 }
