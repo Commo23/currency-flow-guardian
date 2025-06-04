@@ -1,15 +1,17 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useExposures } from "@/contexts/ExposureContext";
+import { useMetrics } from "@/contexts/MetricsContext";
 import { AddExposureDialog } from "@/components/AddExposureDialog";
-import { DollarSign, Calendar, TrendingUp, Edit, Trash2 } from "lucide-react";
+import { DollarSign, Calendar, TrendingUp, Edit, Trash2, BarChart } from "lucide-react";
 
 export default function Exposures() {
   const { t } = useLanguage();
-  const { exposures, addExposure, deleteExposure } = useExposures();
+  const { exposures, deleteExposure } = useExposures();
+  const metrics = useMetrics();
 
-  const totalExposure = exposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
   const exposures30Days = exposures.filter(exp => {
     const expDate = new Date(exp.date);
     const now = new Date();
@@ -23,9 +25,9 @@ export default function Exposures() {
     const negativeExposures = exposures.filter(exp => exp.amount < 0).length;
     const ratio = positiveExposures / (positiveExposures + negativeExposures);
     
-    if (ratio > 0.7) return "Faible";
-    if (ratio > 0.4) return "Modéré";
-    return "Élevé";
+    if (ratio > 0.7) return t('language') === 'en' ? "Low" : "Faible";
+    if (ratio > 0.4) return t('language') === 'en' ? "Medium" : "Modéré";
+    return t('language') === 'en' ? "High" : "Élevé";
   };
 
   return (
@@ -33,52 +35,69 @@ export default function Exposures() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('exposures')}</h1>
-          <p className="text-gray-600 mt-1">Gestion des expositions de change</p>
+          <p className="text-gray-600 mt-1">{t('exposureManagement')}</p>
         </div>
-        <AddExposureDialog onAddExposure={addExposure} />
+        <AddExposureDialog />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="finance-card">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <DollarSign className="h-5 w-5 text-green-600" />
-              <span>Exposition totale</span>
+              <span>{t('totalExposure')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {(totalExposure / 1000000).toFixed(2)}M €
+              {(metrics.totalExposure / 1000000).toFixed(2)}M €
             </div>
-            <p className="text-sm text-gray-500">Toutes devises confondues</p>
+            <p className="text-sm text-gray-500">{t('language') === 'en' ? 'All currencies combined' : 'Toutes devises confondues'}</p>
           </CardContent>
         </Card>
 
         <Card className="finance-card">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5 text-blue-600" />
-              <span>Échéances 30j</span>
+              <BarChart className="h-5 w-5 text-blue-600" />
+              <span>{t('totalNotional')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-gray-900">
-              {(exposures30Days / 1000).toFixed(0)}K €
+              {(metrics.totalNotional / 1000000).toFixed(2)}M €
             </div>
-            <p className="text-sm text-gray-500">Expositions à 30 jours</p>
+            <p className="text-sm text-gray-500">{t('language') === 'en' ? 'Hedging instruments' : 'Instruments de couverture'}</p>
           </CardContent>
         </Card>
 
         <Card className="finance-card">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-amber-600" />
-              <span>Risque moyen</span>
+              <Calendar className="h-5 w-5 text-amber-600" />
+              <span>{t('averageMaturity')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{getRiskLevel()}</div>
-            <p className="text-sm text-gray-500">Évaluation du risque</p>
+            <div className="text-2xl font-bold text-gray-900">
+              {Math.round(metrics.averageMaturity)}{t('language') === 'en' ? 'd' : 'j'}
+            </div>
+            <p className="text-sm text-gray-500">{t('language') === 'en' ? 'Average maturity' : 'Échéance moyenne'}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="finance-card">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <TrendingUp className="h-5 w-5 text-purple-600" />
+              <span>{t('totalMTM')}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-gray-900">
+              {(metrics.totalMTM / 1000).toFixed(0)}K €
+            </div>
+            <p className="text-sm text-gray-500">{t('language') === 'en' ? 'Mark-to-market value' : 'Valeur mark-to-market'}</p>
           </CardContent>
         </Card>
       </div>

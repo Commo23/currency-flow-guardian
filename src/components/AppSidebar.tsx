@@ -67,8 +67,8 @@ export function AppSidebar() {
         <div className="flex items-center space-x-2">
           <Globe className="h-8 w-8 text-primary" />
           <div>
-            <h2 className="text-lg font-semibold text-sidebar-foreground">FX Risk</h2>
-            <p className="text-sm text-sidebar-foreground/70">Management</p>
+            <h2 className="text-lg font-semibold text-sidebar-foreground">{t('appName')}</h2>
+            <p className="text-sm text-sidebar-foreground/70">{language === 'en' ? 'Risk Management' : 'Gestion des Risques'}</p>
           </div>
         </div>
       </SidebarHeader>
@@ -113,11 +113,11 @@ export function AppSidebar() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => setLanguage(language === 'fr' ? 'en' : 'fr')}
+          onClick={() => setLanguage(language === 'en' ? 'fr' : 'en')}
           className="w-full"
         >
           <Languages className="h-4 w-4 mr-2" />
-          {language === 'fr' ? 'English' : 'Français'}
+          {language === 'en' ? 'Français' : 'English'}
         </Button>
       </SidebarFooter>
     </Sidebar>
