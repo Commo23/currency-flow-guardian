@@ -1,7 +1,7 @@
-
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useExposures } from './ExposureContext';
 import { useHedging } from './HedgingContext';
+import { useMarketData } from './MarketDataContext';
 import { calculateMTM } from '@/utils/financialCalculations';
 
 interface MetricsContextType {
@@ -31,6 +31,7 @@ interface MetricsProviderProps {
 export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) => {
   const { exposures } = useExposures();
   const { hedgingInstruments } = useHedging();
+  const { marketData } = useMarketData();
 
   const metrics = useMemo(() => {
     console.log('Recalculating metrics with exposures:', exposures.length, 'instruments:', hedgingInstruments.length);
@@ -41,9 +42,13 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
     // Calculate total notional for instruments
     const totalNotional = hedgingInstruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
     
-    // Calculate total MTM for instruments
+    // Calculate total MTM for instruments using market data
     const totalMTM = hedgingInstruments.reduce((sum, inst) => {
-      const mtm = calculateMTM(inst);
+      const mtm = calculateMTM(inst, {
+        spotRates: marketData.spotRates,
+        volatilities: marketData.volatilities,
+        riskFreeRate: marketData.riskFreeRate
+      });
       console.log(`MTM for ${inst.type} ${inst.currency}:`, mtm);
       return sum + mtm;
     }, 0);
@@ -96,7 +101,7 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
       hedgeRatio,
       unrealizedPnL
     };
-  }, [exposures, hedgingInstruments]);
+  }, [exposures, hedgingInstruments, marketData]);
 
   return (
     <MetricsContext.Provider value={metrics}>

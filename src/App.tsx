@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +9,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ExposureProvider } from "@/contexts/ExposureContext";
 import { HedgingProvider } from "@/contexts/HedgingContext";
+import { MarketDataProvider } from "@/contexts/MarketDataContext";
 import { MetricsProvider } from "@/contexts/MetricsContext";
 import Dashboard from "./pages/Dashboard";
 import Exposures from "./pages/Exposures";
@@ -23,35 +25,37 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <LanguageProvider>
-        <ExposureProvider>
-          <HedgingProvider>
-            <MetricsProvider>
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <SidebarProvider>
-                  <div className="min-h-screen flex w-full">
-                    <AppSidebar />
-                    <main className="flex-1">
-                      <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-2">
-                        <SidebarTrigger />
-                      </div>
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/exposures" element={<Exposures />} />
-                        <Route path="/scenarios" element={<Scenarios />} />
-                        <Route path="/hedging" element={<Hedging />} />
-                        <Route path="/reporting" element={<Reporting />} />
-                        <Route path="/settings" element={<Settings />} />
-                        <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </main>
-                  </div>
-                </SidebarProvider>
-              </BrowserRouter>
-            </MetricsProvider>
+        <MarketDataProvider>
+          <ExposureProvider>
+            <HedgingProvider>
+              <MetricsProvider>
+                <Toaster />
+                <Sonner />
+                <BrowserRouter>
+                  <SidebarProvider>
+                    <div className="min-h-screen flex w-full">
+                      <AppSidebar />
+                      <main className="flex-1">
+                        <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-2">
+                          <SidebarTrigger />
+                        </div>
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/exposures" element={<Exposures />} />
+                          <Route path="/scenarios" element={<Scenarios />} />
+                          <Route path="/hedging" element={<Hedging />} />
+                          <Route path="/reporting" element={<Reporting />} />
+                          <Route path="/settings" element={<Settings />} />
+                          <Route path="*" element={<NotFound />} />
+                        </Routes>
+                      </main>
+                    </div>
+                  </SidebarProvider>
+                </BrowserRouter>
+              </MetricsProvider>
+            </HedgingProvider>
           </HedgingProvider>
-        </ExposureProvider>
+        </MarketDataProvider>
       </LanguageProvider>
     </TooltipProvider>
   </QueryClientProvider>

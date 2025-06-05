@@ -1,15 +1,20 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useExposures } from "@/contexts/ExposureContext";
 import { useMetrics } from "@/contexts/MetricsContext";
 import { AddExposureDialog } from "@/components/AddExposureDialog";
-import { DollarSign, Calendar, TrendingUp, Edit, Trash2, BarChart } from "lucide-react";
+import { ArchivedExposures } from "@/components/ArchivedExposures";
+import { MarketDataSettings } from "@/components/MarketDataSettings";
+import { DollarSign, Calendar, TrendingUp, Edit, Trash2, BarChart, Settings } from "lucide-react";
+import { useState } from "react";
 
 export default function Exposures() {
   const { t } = useLanguage();
-  const { exposures, addExposure, deleteExposure } = useExposures();
+  const { exposures, archivedExposures, addExposure, deleteExposure } = useExposures();
   const metrics = useMetrics();
+  const [showSettings, setShowSettings] = useState(false);
 
   const exposures30Days = exposures.filter(exp => {
     const expDate = new Date(exp.date);
@@ -36,8 +41,23 @@ export default function Exposures() {
           <h1 className="text-3xl font-bold text-gray-900">{t('exposures')}</h1>
           <p className="text-gray-600 mt-1">{t('exposureManagement')}</p>
         </div>
-        <AddExposureDialog onAddExposure={addExposure} />
+        <div className="flex space-x-3">
+          <Button
+            variant="outline"
+            onClick={() => setShowSettings(!showSettings)}
+            className="flex items-center space-x-2"
+          >
+            <Settings className="h-4 w-4" />
+            <span>Données de marché</span>
+          </Button>
+          <AddExposureDialog onAddExposure={addExposure} />
+        </div>
       </div>
+
+      {/* Market Data Settings */}
+      {showSettings && (
+        <MarketDataSettings />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card className="finance-card">
@@ -101,9 +121,10 @@ export default function Exposures() {
         </Card>
       </div>
 
+      {/* Active Exposures */}
       <Card className="finance-card">
         <CardHeader>
-          <CardTitle>Liste des expositions ({exposures.length})</CardTitle>
+          <CardTitle>Expositions actives ({exposures.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -160,6 +181,9 @@ export default function Exposures() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Archived Exposures */}
+      <ArchivedExposures archivedExposures={archivedExposures} />
     </div>
   );
 }

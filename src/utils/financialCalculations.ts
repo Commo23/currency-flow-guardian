@@ -1,4 +1,3 @@
-
 // Fonction d'erreur complémentaire pour le calcul de N(d)
 function erf(x: number): number {
   const a1 = 0.254829592;
@@ -155,19 +154,35 @@ export function blackScholesTheta(
   }
 }
 
-// Calcul du MTM pour tous types d'instruments
+// Calcul du MTM pour tous types d'instruments avec données de marché personnalisées
 export function calculateMTM(
   instrument: any,
-  currentRates: { [key: string]: number } = {
+  marketData?: { 
+    spotRates?: { [key: string]: number };
+    volatilities?: { [key: string]: number };
+    riskFreeRate?: number;
+  }
+): number {
+  const defaultRates = {
     EURUSD: 1.0856,
     EURGBP: 0.8434,
     EURJPY: 161.85,
     EURCHF: 0.9642
-  }
-): number {
+  };
+
+  const defaultVols = {
+    EURUSD: 0.12,
+    EURGBP: 0.10,
+    EURJPY: 0.15,
+    EURCHF: 0.08
+  };
+
+  const currentRates = marketData?.spotRates || defaultRates;
+  const volatilities = marketData?.volatilities || defaultVols;
+  const riskFreeRate = marketData?.riskFreeRate || 0.02;
+
   const timeToExpiry = Math.max(0, (new Date(instrument.maturity).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 365));
-  const riskFreeRate = 0.02; // 2% taux sans risque
-  const volatility = 0.15; // 15% volatilité par défaut
+  const volatility = volatilities[`EUR${instrument.currency}`] || 0.15;
 
   console.log('Calculating MTM for:', instrument.type, instrument.currency, 'TTM:', timeToExpiry);
 
