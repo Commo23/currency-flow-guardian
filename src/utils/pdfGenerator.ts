@@ -1,6 +1,6 @@
 
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 interface ExposureData {
   id: number;
@@ -70,7 +70,7 @@ export const generatePDFReport = (data: ReportData): void => {
     [isEnglish ? 'Average Maturity' : 'Échéance Moyenne', `${Math.round(data.metrics.averageMaturity)} ${isEnglish ? 'days' : 'jours'}`]
   ];
   
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPosition,
     head: [[isEnglish ? 'Metric' : 'Métrique', isEnglish ? 'Value' : 'Valeur']],
     body: summaryData,
@@ -96,7 +96,7 @@ export const generatePDFReport = (data: ReportData): void => {
       exp.description || ''
     ]);
     
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [[
         isEnglish ? 'Currency' : 'Devise',
@@ -136,7 +136,7 @@ export const generatePDFReport = (data: ReportData): void => {
       inst.premium ? `€${(inst.premium / 1000).toFixed(0)}K` : 'N/A'
     ]);
     
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPosition,
       head: [[
         isEnglish ? 'Type' : 'Type',
