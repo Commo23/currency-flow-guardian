@@ -36,9 +36,9 @@ interface HedgingProviderProps {
 
 export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) => {
   const [hedgingInstruments, setHedgingInstruments] = useState<HedgingInstrument[]>([
-    { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-03-15', mtm: 2500 },
-    { id: 2, type: 'Option Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-02-28', premium: 1200, mtm: -800 },
-    { id: 3, type: 'Forward', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-04-10', mtm: 1800 },
+    { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-07-15', mtm: 2500 },
+    { id: 2, type: 'Option Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800 },
+    { id: 3, type: 'Forward', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-08-10', mtm: 1800 },
   ]);
 
   const addHedgingInstrument = (instrumentData: Omit<HedgingInstrument, 'id' | 'mtm'>) => {
@@ -47,6 +47,7 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
       id: Math.max(...hedgingInstruments.map(h => h.id), 0) + 1,
       mtm: calculateMTM(instrumentData)
     };
+    console.log('Adding new hedging instrument:', newInstrument);
     setHedgingInstruments(prev => [...prev, newInstrument]);
   };
 

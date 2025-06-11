@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useExposures } from './ExposureContext';
 import { useHedging } from './HedgingContext';
@@ -34,38 +35,53 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
   const { marketData } = useMarketData();
 
   const metrics = useMemo(() => {
-    console.log('Recalculating metrics with exposures:', exposures.length, 'instruments:', hedgingInstruments.length);
+    console.log('Recalculating metrics with active exposures:', exposures.length, 'active instruments:', hedgingInstruments.length);
     
-    // Calculate total exposure (absolute values)
-    const totalExposure = exposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
+    const now = new Date();
     
-    // Calculate total notional for instruments
-    const totalNotional = hedgingInstruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
+    // Filtrer uniquement les expositions actives (non expirées)
+    const activeExposures = exposures.filter(exp => {
+      const expDate = new Date(exp.date);
+      return expDate >= now;
+    });
     
-    // Calculate total MTM for instruments using market data
-    const totalMTM = hedgingInstruments.reduce((sum, inst) => {
+    // Filtrer uniquement les instruments actifs (non expirés)
+    const activeInstruments = hedgingInstruments.filter(inst => {
+      const maturityDate = new Date(inst.maturity);
+      return maturityDate >= now;
+    });
+    
+    console.log('Active exposures:', activeExposures.length, 'Active instruments:', activeInstruments.length);
+    
+    // Calculate total exposure (absolute values) - uniquement les actives
+    const totalExposure = activeExposures.reduce((sum, exp) => sum + Math.abs(exp.amount), 0);
+    
+    // Calculate total notional for active instruments
+    const totalNotional = activeInstruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
+    
+    // Calculate total MTM for active instruments using market data
+    const totalMTM = activeInstruments.reduce((sum, inst) => {
       const mtm = calculateMTM(inst, {
         spotRates: marketData.spotRates,
         volatilities: marketData.volatilities,
         riskFreeRate: marketData.riskFreeRate
       });
-      console.log(`MTM for ${inst.type} ${inst.currency}:`, mtm);
+      console.log(`MTM for active ${inst.type} ${inst.currency}:`, mtm);
       return sum + mtm;
     }, 0);
     
-    // Calculate average maturity (in days from now)
-    const now = new Date();
-    const exposureMaturitySum = exposures.reduce((sum, exp) => {
+    // Calculate average maturity (in days from now) - uniquement les positions actives
+    const exposureMaturitySum = activeExposures.reduce((sum, exp) => {
       const expDate = new Date(exp.date);
       const diffTime = expDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); // Ne pas prendre les jours négatifs
       return sum + (diffDays * Math.abs(exp.amount));
     }, 0);
     
-    const instrumentMaturitySum = hedgingInstruments.reduce((sum, inst) => {
+    const instrumentMaturitySum = activeInstruments.reduce((sum, inst) => {
       const instDate = new Date(inst.maturity);
       const diffTime = instDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24))); // Ne pas prendre les jours négatifs
       return sum + (diffDays * Math.abs(inst.amount));
     }, 0);
     
@@ -73,7 +89,7 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
     const averageMaturity = totalAmount > 0 ? 
       (exposureMaturitySum + instrumentMaturitySum) / totalAmount : 0;
     
-    // Calculate analyzed exposure (sum of exposure and notional)
+    // Calculate analyzed exposure (sum of active exposure and notional)
     const analyzedExposure = totalExposure + totalNotional;
     
     // Calculate hedge ratio
@@ -82,7 +98,7 @@ export const MetricsProvider: React.FC<MetricsProviderProps> = ({ children }) =>
     // Unrealized P&L is the total MTM
     const unrealizedPnL = totalMTM;
     
-    console.log('Calculated metrics:', {
+    console.log('Calculated metrics (active only):', {
       totalExposure,
       totalMTM,
       totalNotional,
