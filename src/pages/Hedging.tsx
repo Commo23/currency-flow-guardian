@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +10,12 @@ import { AddHedgingDialog } from "@/components/AddHedgingDialog";
 import { GreeksDisplay } from "@/components/GreeksDisplay";
 import { MarketDataSettings } from "@/components/MarketDataSettings";
 import { calculateMTM, calculateTheoreticalPrice } from "@/utils/financialCalculations";
-import { Shield, TrendingUp, Calendar, Edit, Trash2, Eye, BarChart3, DollarSign, Settings } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Edit, Trash2, Eye, BarChart3, DollarSign, Settings, RefreshCw } from "lucide-react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@radix-ui/react-select";
 
 export default function Hedging() {
   const { t } = useLanguage();
-  const { hedgingInstruments, addHedgingInstrument, deleteHedgingInstrument } = useHedging();
+  const { hedgingInstruments, addHedgingInstrument, deleteHedgingInstrument, updateHedgingInstrument } = useHedging();
   const { marketData } = useMarketData();
   const [selectedInstrument, setSelectedInstrument] = useState<number | null>(null);
   const [filter, setFilter] = useState('All');
@@ -41,36 +42,10 @@ export default function Hedging() {
     return true;
   });
 
-  const getInstrumentType = (type: string) => {
-    if (type === 'Forward') return 'Forward';
-    if (type === 'Swap') return 'Swap';
-    if (type.includes('Call') || type.includes('Put')) return 'Option';
-    return 'Other';
-  };
-
   const getEffectiveness = (instrument: any) => {
-    // Simplified effectiveness calculation
     const timeToMaturity = Math.max(0, (new Date(instrument.maturity).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 365));
     const effectiveness = Math.max(70, Math.min(99, 95 - (timeToMaturity * 10)));
     return effectiveness;
-  };
-
-  const getVolatility = (currency: string) => {
-    // Utiliser d'abord la volatilité implicite de l'instrument, sinon celle du marché
-    return (instrument: any) => {
-      if (instrument.impliedVolatility) {
-        return instrument.impliedVolatility * 100; // Convertir en pourcentage
-      }
-      return (marketData.volatilities[`EUR${currency}`] || 0.15) * 100;
-    };
-  };
-
-  const getRiskFreeRate = (instrument: any) => {
-    // Utiliser d'abord le taux spécifique de l'instrument, sinon celui du marché
-    if (instrument.riskFreeRate) {
-      return instrument.riskFreeRate;
-    }
-    return marketData.riskFreeRate;
   };
 
   const getTimeToMaturity = (maturity: string) => {
@@ -78,37 +53,19 @@ export default function Hedging() {
     return Math.max(0, days);
   };
 
-  // Convert percentage values to absolute values for display
-  const getAbsoluteStrike = (instrument: any) => {
-    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
-    if (instrument.strikeType === 'percentage') {
-      return spotRate * (instrument.rate / 100);
+  const getAbsoluteValue = (value: number, type: string, spotRate: number) => {
+    if (type === 'percentage') {
+      return spotRate * (value / 100);
     }
-    return instrument.rate;
+    return value;
   };
 
-  const getAbsoluteBarrier = (instrument: any) => {
-    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
-    if (instrument.barrierType === 'percentage' && instrument.barrier) {
-      return spotRate * (instrument.barrier / 100);
-    }
-    return instrument.barrier;
-  };
-
-  const getAbsoluteLowerBarrier = (instrument: any) => {
-    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
-    if (instrument.barrierType === 'percentage' && instrument.lowerBarrier) {
-      return spotRate * (instrument.lowerBarrier / 100);
-    }
-    return instrument.lowerBarrier;
-  };
-
-  const getAbsoluteUpperBarrier = (instrument: any) => {
-    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
-    if (instrument.barrierType === 'percentage' && instrument.upperBarrier) {
-      return spotRate * (instrument.upperBarrier / 100);
-    }
-    return instrument.upperBarrier;
+  const recalculateAllMTM = () => {
+    console.log('Recalculating all MTM with current market data...');
+    hedgingInstruments.forEach(instrument => {
+      const newMTM = calculateMTM(instrument, marketData);
+      updateHedgingInstrument(instrument.id, { mtm: newMTM });
+    });
   };
 
   return (
@@ -138,13 +95,10 @@ export default function Hedging() {
           </Button>
           <Button 
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
-            onClick={() => {
-              // Trigger recalculation of all MTM
-              console.log('Recalculating all MTM...');
-            }}
+            onClick={recalculateAllMTM}
           >
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Recalculate All MTM
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Recalculer MTM
           </Button>
           <AddHedgingDialog onAddHedging={addHedgingInstrument} />
         </div>
@@ -168,7 +122,7 @@ export default function Hedging() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-slate-900">
-              ${(totalNotional / 1000000).toFixed(2)}M
+              €{(totalNotional / 1000000).toFixed(2)}M
             </div>
             <p className="text-sm text-slate-500">{hedgingInstruments.length} instruments</p>
           </CardContent>
@@ -185,7 +139,7 @@ export default function Hedging() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${totalMTM >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              ${(totalMTM / 1000).toFixed(1)}K
+              €{(totalMTM / 1000).toFixed(1)}K
             </div>
             <p className="text-sm text-slate-500">Unrealized P&L</p>
           </CardContent>
@@ -246,19 +200,6 @@ export default function Hedging() {
               <Shield className="h-6 w-6 mr-2 text-blue-600" />
               Instruments de Couverture
             </CardTitle>
-            <div className="flex items-center space-x-4">
-              <Select value={filter} onValueChange={setFilter}>
-                <SelectTrigger className="w-40 bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="All">Tous</SelectItem>
-                  <SelectItem value="Options">Options</SelectItem>
-                  <SelectItem value="Forwards">Forwards</SelectItem>
-                  <SelectItem value="Swaps">Swaps</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
         </CardHeader>
         
@@ -274,8 +215,8 @@ export default function Hedging() {
                   <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Barrière</th>
                   <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Prime</th>
                   <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">MTM</th>
-                  <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Prix Théo/Unit</th>
-                  <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">TTM</th>
+                  <th className="p-4 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider">Prix Théo</th>
+                  <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">TTM (j)</th>
                   <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Vol Impl (%)</th>
                   <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Taux (%)</th>
                   <th className="p-4 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider">Efficacité</th>
@@ -293,46 +234,40 @@ export default function Hedging() {
                   filteredInstruments.map((instrument, index) => {
                     const ttm = getTimeToMaturity(instrument.maturity);
                     const effectiveness = getEffectiveness(instrument);
-                    const instrumentVolatility = getVolatility(instrument.currency)(instrument);
-                    const instrumentRiskFreeRate = getRiskFreeRate(instrument);
                     const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
                     
-                    // Calculate effective strike and barriers for display
-                    let displayStrike = instrument.rate;
-                    if (instrument.strikeType === 'percentage') {
-                      displayStrike = spotRate * (instrument.rate / 100);
-                    }
-
+                    // Calcul des valeurs absolues pour affichage
+                    const displayStrike = getAbsoluteValue(instrument.rate, instrument.strikeType, spotRate);
+                    
                     let displayBarrier = '';
                     if (instrument.barrier) {
-                      if (instrument.barrierType === 'percentage') {
-                        displayBarrier = (spotRate * (instrument.barrier / 100)).toFixed(4);
-                      } else {
-                        displayBarrier = instrument.barrier.toFixed(4);
-                      }
+                      const absBarrier = getAbsoluteValue(instrument.barrier, instrument.barrierType, spotRate);
+                      displayBarrier = absBarrier.toFixed(4);
                     } else if (instrument.lowerBarrier && instrument.upperBarrier) {
-                      let lowerDisplay, upperDisplay;
-                      if (instrument.barrierType === 'percentage') {
-                        lowerDisplay = (spotRate * (instrument.lowerBarrier / 100)).toFixed(4);
-                        upperDisplay = (spotRate * (instrument.upperBarrier / 100)).toFixed(4);
-                      } else {
-                        lowerDisplay = instrument.lowerBarrier.toFixed(4);
-                        upperDisplay = instrument.upperBarrier.toFixed(4);
-                      }
-                      displayBarrier = `${lowerDisplay} / ${upperDisplay}`;
+                      const lowerAbs = getAbsoluteValue(instrument.lowerBarrier, instrument.barrierType, spotRate);
+                      const upperAbs = getAbsoluteValue(instrument.upperBarrier, instrument.barrierType, spotRate);
+                      displayBarrier = `${lowerAbs.toFixed(4)} / ${upperAbs.toFixed(4)}`;
                     }
                     
-                    // Calculate theoretical price per unit using instrument-specific parameters
-                    const marketDataForCalc = {
+                    // Calcul du prix théorique avec paramètres de l'instrument
+                    const instrumentMarketData = {
                       spotRates: marketData.spotRates,
                       volatilities: instrument.impliedVolatility ? 
                         { [`EUR${instrument.currency}`]: instrument.impliedVolatility } : 
                         marketData.volatilities,
-                      riskFreeRate: instrumentRiskFreeRate
+                      riskFreeRate: instrument.riskFreeRate || marketData.riskFreeRate
                     };
                     
-                    const theoreticalPriceTotal = calculateTheoreticalPrice(instrument, marketDataForCalc);
-                    const theoreticalPricePerUnit = theoreticalPriceTotal;
+                    const theoreticalPrice = calculateTheoreticalPrice(instrument, instrumentMarketData);
+                    
+                    // Affichage de la volatilité et du taux utilisés
+                    const displayVolatility = instrument.impliedVolatility ? 
+                      (instrument.impliedVolatility * 100).toFixed(1) + ' (impl)' : 
+                      ((marketData.volatilities[`EUR${instrument.currency}`] || 0.15) * 100).toFixed(1) + ' (mkt)';
+                    
+                    const displayRate = instrument.riskFreeRate ? 
+                      (instrument.riskFreeRate * 100).toFixed(2) + ' (inst)' : 
+                      (marketData.riskFreeRate * 100).toFixed(2) + ' (mkt)';
 
                     return (
                       <tr 
@@ -369,11 +304,19 @@ export default function Hedging() {
                           €{instrument.mtm.toLocaleString()}
                         </td>
                         <td className="p-3 text-right font-mono text-sm text-blue-600">
-                          {theoreticalPricePerUnit.toFixed(6)}
+                          {theoreticalPrice.toFixed(6)}
                         </td>
-                        <td className="p-3">{ttm}d</td>
-                        <td className="p-3 font-semibold text-orange-600">{instrumentVolatility.toFixed(1)}%</td>
-                        <td className="p-3 font-semibold text-blue-600">{(instrumentRiskFreeRate * 100).toFixed(2)}%</td>
+                        <td className="p-3 text-center">{ttm}</td>
+                        <td className="p-3 text-center text-sm">
+                          <span className={instrument.impliedVolatility ? 'text-orange-600 font-semibold' : 'text-slate-500'}>
+                            {displayVolatility}
+                          </span>
+                        </td>
+                        <td className="p-3 text-center text-sm">
+                          <span className={instrument.riskFreeRate ? 'text-blue-600 font-semibold' : 'text-slate-500'}>
+                            {displayRate}
+                          </span>
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center space-x-2">
                             <div className="w-16 bg-slate-200 rounded-full h-2">
@@ -429,7 +372,12 @@ export default function Hedging() {
         </CardContent>
       </Card>
 
-      {/* ... keep existing code (Greeks display) */}
+      {/* Greeks Display */}
+      {selectedInstrument && (
+        <GreeksDisplay 
+          instrument={hedgingInstruments.find(inst => inst.id === selectedInstrument)} 
+        />
+      )}
     </div>
   );
 }
