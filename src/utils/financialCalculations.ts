@@ -21,39 +21,7 @@ function normalCDF(x: number): number {
   return 0.5 * (1 + erf(x / Math.sqrt(2)));
 }
 
-// Calcul de la volatilité implicite (approximation simple)
-function calculateImpliedVolatility(
-  spotPrice: number,
-  strikePrice: number,
-  timeToExpiry: number,
-  riskFreeRate: number,
-  optionPrice: number,
-  isCall: boolean
-): number {
-  // Approximation de Brenner et Subrahmanyam
-  const moneyness = Math.log(spotPrice / strikePrice);
-  const sqrt2pi = Math.sqrt(2 * Math.PI);
-  
-  const initialGuess = sqrt2pi * optionPrice / spotPrice * Math.sqrt(1 / timeToExpiry);
-  
-  // Méthode de Newton-Raphson simplifiée
-  let vol = initialGuess;
-  for (let i = 0; i < 10; i++) {
-    const bs = blackScholesPrice(spotPrice, strikePrice, timeToExpiry, riskFreeRate, vol, isCall);
-    const vega = blackScholesVega(spotPrice, strikePrice, timeToExpiry, riskFreeRate, vol);
-    
-    if (Math.abs(vega) < 1e-10) break;
-    
-    const diff = bs - optionPrice;
-    vol = vol - diff / vega;
-    
-    if (Math.abs(diff) < 1e-6) break;
-  }
-  
-  return Math.max(0.01, vol); // Minimum 1% volatility
-}
-
-// Garman-Kohlhagen model for vanilla FX options
+// Garman-Kohlhagen model for vanilla FX options (prix par unité)
 export function garmanKohlhagenPrice(
   spotPrice: number,
   strikePrice: number,
@@ -80,7 +48,7 @@ export function garmanKohlhagenPrice(
   }
 }
 
-// Closed-form solution for barrier options (simplified)
+// Closed-form solution for barrier options (prix par unité)
 export function barrierOptionClosedForm(
   spotPrice: number,
   strikePrice: number,
@@ -94,23 +62,57 @@ export function barrierOptionClosedForm(
 ): number {
   if (timeToExpiry <= 0) return 0;
 
-  // Simplified barrier option pricing using reflection principle
+  // Prix vanilla de référence
   const vanillaPrice = garmanKohlhagenPrice(spotPrice, strikePrice, timeToExpiry, domesticRate, foreignRate, volatility, isCall);
   
-  // Barrier factor calculation
-  const lambda = (domesticRate - foreignRate + 0.5 * volatility * volatility) / (volatility * volatility);
-  const y = Math.log(barrier * barrier / (spotPrice * strikePrice)) / (volatility * Math.sqrt(timeToExpiry)) + lambda * volatility * Math.sqrt(timeToExpiry);
+  // Paramètres pour le calcul de barrière
+  const mu = domesticRate - foreignRate - 0.5 * volatility * volatility;
+  const lambda = (mu + 0.5 * volatility * volatility) / (volatility * volatility);
   
-  const barrierFactor = Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(isCall ? y : -y);
+  const x1 = Math.log(spotPrice / strikePrice) / (volatility * Math.sqrt(timeToExpiry)) + lambda * volatility * Math.sqrt(timeToExpiry);
+  const x2 = Math.log(spotPrice / barrier) / (volatility * Math.sqrt(timeToExpiry)) + lambda * volatility * Math.sqrt(timeToExpiry);
   
-  if (isKnockOut) {
-    return vanillaPrice * (1 - barrierFactor);
+  const y1 = Math.log(barrier * barrier / (spotPrice * strikePrice)) / (volatility * Math.sqrt(timeToExpiry)) + lambda * volatility * Math.sqrt(timeToExpiry);
+  const y2 = Math.log(barrier / spotPrice) / (volatility * Math.sqrt(timeToExpiry)) + lambda * volatility * Math.sqrt(timeToExpiry);
+  
+  let barrierAdjustment = 0;
+  
+  if (isCall) {
+    if (barrier <= strikePrice) {
+      // Down-and-out call
+      const A = spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(x1) - strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(x1 - volatility * Math.sqrt(timeToExpiry));
+      const B = spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(x2) - strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(x2 - volatility * Math.sqrt(timeToExpiry));
+      const C = spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(y1) - 
+                strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * normalCDF(y1 - volatility * Math.sqrt(timeToExpiry));
+      const D = spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(y2) - 
+                strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * normalCDF(y2 - volatility * Math.sqrt(timeToExpiry));
+      
+      barrierAdjustment = isKnockOut ? A - B - C + D : vanillaPrice - (A - B - C + D);
+    } else {
+      // Up-and-out call
+      barrierAdjustment = isKnockOut ? 0 : vanillaPrice;
+    }
   } else {
-    return vanillaPrice * barrierFactor;
+    if (barrier >= strikePrice) {
+      // Up-and-out put
+      const A = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(-x1) + strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(-x1 + volatility * Math.sqrt(timeToExpiry));
+      const B = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(-x2) + strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(-x2 + volatility * Math.sqrt(timeToExpiry));
+      const C = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(-y1) + 
+                strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * normalCDF(-y1 + volatility * Math.sqrt(timeToExpiry));
+      const D = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(-y2) + 
+                strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * normalCDF(-y2 + volatility * Math.sqrt(timeToExpiry));
+      
+      barrierAdjustment = isKnockOut ? A - B - C + D : vanillaPrice - (A - B - C + D);
+    } else {
+      // Down-and-out put
+      barrierAdjustment = isKnockOut ? 0 : vanillaPrice;
+    }
   }
+  
+  return Math.max(0, barrierAdjustment);
 }
 
-// Monte Carlo simulation for digital options
+// Monte Carlo simulation for digital options (prix par unité)
 export function monteCarloDigitalOption(
   spotPrice: number,
   lowerBarrier: number,
@@ -121,40 +123,47 @@ export function monteCarloDigitalOption(
   volatility: number,
   payout: number,
   isRange: boolean,
-  numSimulations: number = 10000
+  numSimulations: number = 50000
 ): number {
   if (timeToExpiry <= 0) return 0;
 
   let payoffSum = 0;
-  const dt = timeToExpiry / 252; // Daily steps
+  const numSteps = Math.max(10, Math.floor(timeToExpiry * 252)); // Steps journaliers
+  const dt = timeToExpiry / numSteps;
   const drift = domesticRate - foreignRate - 0.5 * volatility * volatility;
+  const diffusion = volatility * Math.sqrt(dt);
   
   for (let i = 0; i < numSimulations; i++) {
     let currentSpot = spotPrice;
     let pathValid = true;
     
-    // Simulate path
-    for (let j = 0; j < 252 * timeToExpiry; j++) {
-      const randomShock = Math.random() * 2 - 1; // Box-Muller would be better
-      const gaussianRandom = Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * randomShock);
+    // Simulation du chemin
+    for (let j = 0; j < numSteps && pathValid; j++) {
+      // Box-Muller pour générer des nombres gaussiens
+      const u1 = Math.random();
+      const u2 = Math.random();
+      const gaussianRandom = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
       
-      currentSpot *= Math.exp(drift * dt + volatility * Math.sqrt(dt) * gaussianRandom);
+      currentSpot *= Math.exp(drift * dt + diffusion * gaussianRandom);
       
-      // Check barrier conditions
+      // Vérification des conditions de barrière
       if (isRange) {
+        // Range binary: le spot doit rester entre les barrières
         if (currentSpot <= lowerBarrier || currentSpot >= upperBarrier) {
           pathValid = false;
-          break;
         }
       } else {
-        if (currentSpot > lowerBarrier && currentSpot < upperBarrier) {
+        // Outside binary: le spot doit sortir de la zone
+        if (currentSpot <= lowerBarrier || currentSpot >= upperBarrier) {
           pathValid = false;
+          payoffSum += payout; // Payout si on sort de la zone
           break;
         }
       }
     }
     
-    if (pathValid) {
+    // Pour range binary, payout si le chemin est resté valide
+    if (isRange && pathValid) {
       payoffSum += payout;
     }
   }
@@ -163,7 +172,7 @@ export function monteCarloDigitalOption(
   return averagePayoff * Math.exp(-domesticRate * timeToExpiry);
 }
 
-// Calculate theoretical price based on instrument type
+// Calculate theoretical price based on instrument type (prix par unité)
 export function calculateTheoreticalPrice(
   instrument: any,
   marketData?: { 
@@ -189,13 +198,13 @@ export function calculateTheoreticalPrice(
   const currentRates = marketData?.spotRates || defaultRates;
   const volatilities = marketData?.volatilities || defaultVols;
   const domesticRate = marketData?.riskFreeRate || 0.02;
-  const foreignRate = 0.005; // Simplified foreign rate
+  const foreignRate = 0.005; // Taux étranger simplifié
 
   const timeToExpiry = Math.max(0, (new Date(instrument.maturity).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 365));
   const volatility = volatilities[`EUR${instrument.currency}`] || 0.15;
   const spotRate = currentRates[`EUR${instrument.currency}`] || 1;
 
-  // Calculate effective parameters
+  // Calcul des paramètres effectifs (conversion pourcentage -> absolu)
   let effectiveStrike = instrument.rate;
   if (instrument.strikeType === 'percentage') {
     effectiveStrike = spotRate * (instrument.rate / 100);
@@ -211,16 +220,17 @@ export function calculateTheoreticalPrice(
     if (effectiveUpperBarrier) effectiveUpperBarrier = spotRate * (instrument.upperBarrier / 100);
   }
 
-  console.log('Calculating theoretical price for:', instrument.type, instrument.currency);
+  console.log('Calculating theoretical price per unit for:', instrument.type, instrument.currency);
 
   switch (instrument.type) {
     case 'Forward':
-      // Forward theoretical price (discounted difference)
-      return instrument.amount * (spotRate - effectiveStrike) * Math.exp(-domesticRate * timeToExpiry);
+      // Forward theoretical price par unité
+      const forwardPrice = (spotRate - effectiveStrike) * Math.exp(-domesticRate * timeToExpiry);
+      return forwardPrice;
 
     case 'Call':
     case 'Put':
-      // Garman-Kohlhagen for vanilla options
+      // Garman-Kohlhagen pour options vanilles (prix par unité)
       const isCall = instrument.type === 'Call';
       return garmanKohlhagenPrice(
         spotRate,
@@ -230,9 +240,9 @@ export function calculateTheoreticalPrice(
         foreignRate,
         volatility,
         isCall
-      ) * instrument.amount;
+      );
 
-    // Barrier options - Closed form
+    // Options à barrière - Closed form (prix par unité)
     case 'Call Knock-Out':
     case 'Put Knock-Out':
     case 'Call Knock-In':
@@ -249,12 +259,13 @@ export function calculateTheoreticalPrice(
         volatility,
         isCallBarrier,
         isKnockOut
-      ) * instrument.amount;
+      );
 
-    // Digital options - Monte Carlo
+    // Options digitales - Monte Carlo (prix par unité)
     case 'Range Binary (beta)':
     case 'Outside Binary (beta)':
       const isRange = instrument.type.includes('Range');
+      const payoutPerUnit = 1; // Payout normalisé par unité
       return monteCarloDigitalOption(
         spotRate,
         effectiveLowerBarrier,
@@ -263,24 +274,27 @@ export function calculateTheoreticalPrice(
         domesticRate,
         foreignRate,
         volatility,
-        instrument.amount,
+        payoutPerUnit,
         isRange
       );
 
     case 'One Touch (beta)':
     case 'No Touch (beta)':
-      // Simplified touch option pricing
+      // Options touch simplifiées (prix par unité)
       const isOneTouch = instrument.type.includes('One Touch');
-      const touchProb = normalCDF(Math.log(effectiveBarrier / spotRate) / (volatility * Math.sqrt(timeToExpiry)));
-      const expectedValue = isOneTouch ? touchProb * instrument.amount : (1 - touchProb) * instrument.amount;
+      const d = Math.log(effectiveBarrier / spotRate) / (volatility * Math.sqrt(timeToExpiry));
+      const touchProb = normalCDF(Math.abs(d));
+      const expectedValue = isOneTouch ? touchProb : (1 - touchProb);
       return expectedValue * Math.exp(-domesticRate * timeToExpiry);
 
     case 'Swap':
-      // Swap theoretical value
-      return instrument.amount * (spotRate - effectiveStrike) * timeToExpiry * Math.exp(-domesticRate * timeToExpiry);
+      // Swap theoretical value par unité
+      const swapRate = (spotRate - effectiveStrike) * timeToExpiry;
+      return swapRate * Math.exp(-domesticRate * timeToExpiry);
 
     default:
-      return calculateMTM(instrument, marketData);
+      console.log('Unknown instrument type for theoretical pricing:', instrument.type);
+      return 0;
   }
 }
 

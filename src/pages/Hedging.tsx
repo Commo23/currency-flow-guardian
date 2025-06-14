@@ -62,6 +62,39 @@ export default function Hedging() {
     return Math.max(0, days);
   };
 
+  // Convert percentage values to absolute values for display
+  const getAbsoluteStrike = (instrument: any) => {
+    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
+    if (instrument.strikeType === 'percentage') {
+      return spotRate * (instrument.rate / 100);
+    }
+    return instrument.rate;
+  };
+
+  const getAbsoluteBarrier = (instrument: any) => {
+    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
+    if (instrument.barrierType === 'percentage' && instrument.barrier) {
+      return spotRate * (instrument.barrier / 100);
+    }
+    return instrument.barrier;
+  };
+
+  const getAbsoluteLowerBarrier = (instrument: any) => {
+    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
+    if (instrument.barrierType === 'percentage' && instrument.lowerBarrier) {
+      return spotRate * (instrument.lowerBarrier / 100);
+    }
+    return instrument.lowerBarrier;
+  };
+
+  const getAbsoluteUpperBarrier = (instrument: any) => {
+    const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
+    if (instrument.barrierType === 'percentage' && instrument.upperBarrier) {
+      return spotRate * (instrument.upperBarrier / 100);
+    }
+    return instrument.upperBarrier;
+  };
+
   return (
     <div className="p-6 space-y-8 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 min-h-screen">
       {/* Header */}
@@ -192,12 +225,14 @@ export default function Hedging() {
                       <th className="text-left p-3 font-semibold text-slate-700">Type</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Currency Pair</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Quantity</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Rate/Strike</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Strike</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Barrier</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Today Price</th>
                       <th className="text-left p-3 font-semibold text-slate-700">MTM</th>
-                      <th className="text-left p-3 font-semibold text-slate-700">Theoretical Price</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Theoretical Price (Unit)</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Time to Maturity</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Volatility</th>
+                      <th className="text-left p-3 font-semibold text-slate-700">Risk-Free Rate</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Effectiveness</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Status</th>
                       <th className="text-left p-3 font-semibold text-slate-700">Actions</th>
@@ -209,11 +244,22 @@ export default function Hedging() {
                       const effectiveness = getEffectiveness(instrument);
                       const volatility = getVolatility(instrument.currency);
                       const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
-                      const theoreticalPrice = calculateTheoreticalPrice(instrument, {
+                      const riskFreeRate = marketData.riskFreeRate;
+                      
+                      // Calculate theoretical price per unit (not total)
+                      const theoreticalPriceTotal = calculateTheoreticalPrice(instrument, {
                         spotRates: marketData.spotRates,
                         volatilities: marketData.volatilities,
                         riskFreeRate: marketData.riskFreeRate
                       });
+                      const theoreticalPricePerUnit = Math.abs(instrument.amount) > 0 ? 
+                        theoreticalPriceTotal / Math.abs(instrument.amount) : 0;
+                      
+                      // Get absolute values for display
+                      const absoluteStrike = getAbsoluteStrike(instrument);
+                      const absoluteBarrier = getAbsoluteBarrier(instrument);
+                      const absoluteLowerBarrier = getAbsoluteLowerBarrier(instrument);
+                      const absoluteUpperBarrier = getAbsoluteUpperBarrier(instrument);
                       
                       return (
                         <tr key={instrument.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selectedInstrument === instrument.id ? 'bg-blue-50' : ''}`}>
@@ -234,16 +280,25 @@ export default function Hedging() {
                           </td>
                           <td className="p-3 font-semibold">EUR/{instrument.currency}</td>
                           <td className="p-3">${(Math.abs(instrument.amount) / 1000).toFixed(0)}K</td>
-                          <td className="p-3 font-mono text-xs">{instrument.rate.toFixed(4)}</td>
+                          <td className="p-3 font-mono text-xs">{absoluteStrike.toFixed(4)}</td>
+                          <td className="p-3 font-mono text-xs">
+                            {instrument.type.includes('Double') ? (
+                              absoluteLowerBarrier && absoluteUpperBarrier ? 
+                                `${absoluteLowerBarrier.toFixed(4)} / ${absoluteUpperBarrier.toFixed(4)}` : '-'
+                            ) : (
+                              absoluteBarrier ? absoluteBarrier.toFixed(4) : '-'
+                            )}
+                          </td>
                           <td className="p-3 font-mono text-xs text-blue-600 font-semibold">{spotRate.toFixed(4)}</td>
                           <td className={`p-3 font-semibold ${instrument.mtm >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                             {instrument.mtm >= 0 ? '+' : ''}${(instrument.mtm / 1000).toFixed(1)}K
                           </td>
-                          <td className="p-3 font-mono text-xs">
-                            ${(theoreticalPrice / 1000).toFixed(1)}K
+                          <td className="p-3 font-mono text-xs font-semibold text-purple-600">
+                            {theoreticalPricePerUnit.toFixed(6)}
                           </td>
                           <td className="p-3">{ttm}d</td>
                           <td className="p-3">{volatility.toFixed(1)}%</td>
+                          <td className="p-3">{(riskFreeRate * 100).toFixed(2)}%</td>
                           <td className="p-3">
                             <div className="flex items-center space-x-2">
                               <div className="w-16 bg-slate-200 rounded-full h-2">
