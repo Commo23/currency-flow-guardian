@@ -21,6 +21,7 @@ interface ExposureContextType {
   updateExposure: (id: number, exposure: Partial<Exposure>) => void;
   deleteExposure: (id: number) => void;
   archiveExpiredExposures: () => void;
+  lastUpdated: number; // Pour forcer les mises à jour
 }
 
 const ExposureContext = createContext<ExposureContextType | undefined>(undefined);
@@ -38,11 +39,12 @@ interface ExposureProviderProps {
 }
 
 export const ExposureProvider: React.FC<ExposureProviderProps> = ({ children }) => {
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
   const [exposures, setExposures] = useState<Exposure[]>([
-    { id: 1, currency: 'EUR', amount: 1200000, date: '2024-06-15', type: 'Encaissement', description: 'Vente export' },
-    { id: 2, currency: 'USD', amount: -800000, date: '2024-06-20', type: 'Décaissement', description: 'Achat matières premières' },
-    { id: 3, currency: 'GBP', amount: 500000, date: '2024-07-01', type: 'Encaissement', description: 'Contrat service' },
-    { id: 4, currency: 'JPY', amount: -300000, date: '2024-07-10', type: 'Décaissement', description: 'Fournisseur Japon' },
+    { id: 1, currency: 'EUR', amount: 1200000, date: '2024-07-15', type: 'Encaissement', description: 'Vente export' },
+    { id: 2, currency: 'USD', amount: -800000, date: '2024-07-20', type: 'Décaissement', description: 'Achat matières premières' },
+    { id: 3, currency: 'GBP', amount: 500000, date: '2024-08-01', type: 'Encaissement', description: 'Contrat service' },
+    { id: 4, currency: 'JPY', amount: -300000, date: '2024-08-10', type: 'Décaissement', description: 'Fournisseur Japon' },
   ]);
 
   const [archivedExposures, setArchivedExposures] = useState<ArchivedExposure[]>([
@@ -58,21 +60,23 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({ children }) 
     };
     console.log('Adding new exposure:', newExposure);
     setExposures(prev => [...prev, newExposure]);
+    setLastUpdated(Date.now());
   };
 
   const updateExposure = (id: number, exposureData: Partial<Exposure>) => {
     setExposures(prev => prev.map(exp => 
       exp.id === id ? { ...exp, ...exposureData } : exp
     ));
+    setLastUpdated(Date.now());
   };
 
   const deleteExposure = (id: number) => {
     setExposures(prev => prev.filter(exp => exp.id !== id));
+    setLastUpdated(Date.now());
   };
 
   const archiveExpiredExposures = () => {
     const now = new Date();
-    // Ajoutons un buffer de 1 jour pour éviter l'archivage immédiat des expositions du jour même
     const bufferDate = new Date(now.getTime() - (24 * 60 * 60 * 1000));
     const expiredExposures: ArchivedExposure[] = [];
     const activeExposures: Exposure[] = [];
@@ -92,14 +96,14 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({ children }) 
     if (expiredExposures.length > 0) {
       setArchivedExposures(prev => [...prev, ...expiredExposures]);
       setExposures(activeExposures);
+      setLastUpdated(Date.now());
       console.log(`Archived ${expiredExposures.length} expired exposures`);
     }
   };
 
-  // Auto-archive expired exposures only on mount, not continuously
   useEffect(() => {
     archiveExpiredExposures();
-  }, []); // Removed dependency array to run only once
+  }, []);
 
   return (
     <ExposureContext.Provider value={{
@@ -108,7 +112,8 @@ export const ExposureProvider: React.FC<ExposureProviderProps> = ({ children }) 
       addExposure,
       updateExposure,
       deleteExposure,
-      archiveExpiredExposures
+      archiveExpiredExposures,
+      lastUpdated
     }}>
       {children}
     </ExposureContext.Provider>

@@ -28,6 +28,7 @@ interface HedgingContextType {
   addHedgingInstrument: (instrument: Omit<HedgingInstrument, 'id' | 'mtm'>) => void;
   updateHedgingInstrument: (id: number, instrument: Partial<HedgingInstrument>) => void;
   deleteHedgingInstrument: (id: number) => void;
+  lastUpdated: number; // Pour forcer les mises à jour
 }
 
 const HedgingContext = createContext<HedgingContextType | undefined>(undefined);
@@ -45,6 +46,7 @@ interface HedgingProviderProps {
 }
 
 export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) => {
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
   const [hedgingInstruments, setHedgingInstruments] = useState<HedgingInstrument[]>([
     { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-07-15', mtm: 2500, strikeType: 'absolute' },
     { id: 2, type: 'Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800, strikeType: 'absolute' },
@@ -59,6 +61,7 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
     };
     console.log('Adding new hedging instrument:', newInstrument);
     setHedgingInstruments(prev => [...prev, newInstrument]);
+    setLastUpdated(Date.now());
   };
 
   const updateHedgingInstrument = (id: number, instrumentData: Partial<HedgingInstrument>) => {
@@ -72,10 +75,12 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
       }
       return inst;
     }));
+    setLastUpdated(Date.now());
   };
 
   const deleteHedgingInstrument = (id: number) => {
     setHedgingInstruments(prev => prev.filter(inst => inst.id !== id));
+    setLastUpdated(Date.now());
   };
 
   return (
@@ -83,7 +88,8 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
       hedgingInstruments,
       addHedgingInstrument,
       updateHedgingInstrument,
-      deleteHedgingInstrument
+      deleteHedgingInstrument,
+      lastUpdated
     }}>
       {children}
     </HedgingContext.Provider>
