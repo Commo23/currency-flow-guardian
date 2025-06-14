@@ -132,7 +132,7 @@ export function garmanKohlhagenTheta(
   }
 }
 
-// Options à barrière - formule analytique Garman-Kohlhagen modifiée
+// Options à barrière - formule analytique corrigée
 export function barrierOptionPrice(
   spotPrice: number,
   strikePrice: number,
@@ -146,87 +146,137 @@ export function barrierOptionPrice(
   rebate: number = 0
 ): number {
   if (timeToExpiry <= 0) {
-    const barrierTouched = isCall ? (spotPrice <= barrier) : (spotPrice >= barrier);
+    const intrinsicValue = Math.max(0, isCall ? spotPrice - strikePrice : strikePrice - spotPrice);
+    
+    // Vérifier si la barrière a été touchée
+    const barrierTouched = isCall ? 
+      (barrier > strikePrice ? spotPrice >= barrier : spotPrice <= barrier) :
+      (barrier < strikePrice ? spotPrice <= barrier : spotPrice >= barrier);
     
     if (isKnockOut && barrierTouched) {
       return rebate;
     } else if (!isKnockOut && !barrierTouched) {
       return rebate;
     } else {
-      return Math.max(0, isCall ? spotPrice - strikePrice : strikePrice - spotPrice);
+      return intrinsicValue;
     }
   }
 
-  const mu = domesticRate - foreignRate - 0.5 * volatility * volatility;
-  const lambda = (mu + 0.5 * volatility * volatility) / (volatility * volatility);
-  
-  const x1 = Math.log(spotPrice / strikePrice) / (volatility * Math.sqrt(timeToExpiry)) + 
-            lambda * volatility * Math.sqrt(timeToExpiry);
-  const y1 = Math.log(barrier / spotPrice) / (volatility * Math.sqrt(timeToExpiry)) + 
-            lambda * volatility * Math.sqrt(timeToExpiry);
-  const y = Math.log(barrier * barrier / (spotPrice * strikePrice)) / (volatility * Math.sqrt(timeToExpiry)) + 
-           lambda * volatility * Math.sqrt(timeToExpiry);
+  console.log('Barrier option calculation:', {
+    spotPrice, strikePrice, barrier, timeToExpiry, 
+    domesticRate, foreignRate, volatility, isCall, isKnockOut
+  });
 
   // Prix vanilla de référence
-  const vanillaPrice = garmanKohlhagenPrice(spotPrice, strikePrice, timeToExpiry, domesticRate, foreignRate, volatility, isCall);
-  
-  let barrierPrice = 0;
-  
-  if (isCall) {
-    if (barrier <= strikePrice) {
-      // Down-and-out call
-      const A = spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(x1) - 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(x1 - volatility * Math.sqrt(timeToExpiry));
-      const B = spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(y1) - 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(y1 - volatility * Math.sqrt(timeToExpiry));
-      const C = spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(y) - 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * 
-               normalCDF(y - volatility * Math.sqrt(timeToExpiry));
+  const vanillaPrice = garmanKohlhagenPrice(
+    spotPrice, strikePrice, timeToExpiry, 
+    domesticRate, foreignRate, volatility, isCall
+  );
 
+  // Paramètres pour le calcul des barrières
+  const sigma = volatility;
+  const r = domesticRate;
+  const q = foreignRate;
+  const S = spotPrice;
+  const K = strikePrice;
+  const H = barrier;
+  const T = timeToExpiry;
+
+  const mu = (r - q - 0.5 * sigma * sigma) / (sigma * sigma);
+  const lambda = Math.sqrt(mu * mu + 2 * r / (sigma * sigma));
+
+  // Calculer d1, d2 pour l'option vanilla
+  const d1 = (Math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+
+  // Variables pour les barrières
+  const eta = isCall ? 1 : -1;
+  const phi = (H > S) ? 1 : -1;
+
+  let barrierPrice = 0;
+
+  if (isCall) {
+    if (H <= K) {
+      // Down-and-Out Call (H < K)
       if (isKnockOut) {
+        const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+        const x1 = (Math.log(S / H) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+        
+        const A = S * Math.exp(-q * T) * normalCDF(d1) - K * Math.exp(-r * T) * normalCDF(d2);
+        const B = S * Math.exp(-q * T) * normalCDF(y1) - K * Math.exp(-r * T) * normalCDF(y1 - sigma * Math.sqrt(T));
+        const C = S * Math.exp(-q * T) * Math.pow(H / S, 2 * (r - q) / (sigma * sigma)) * normalCDF(x1) -
+                  K * Math.exp(-r * T) * Math.pow(H / S, 2 * (r - q) / (sigma * sigma) - 2) * normalCDF(x1 - sigma * Math.sqrt(T));
+
         barrierPrice = A - B - C;
       } else {
-        barrierPrice = B + C;
+        // Down-and-In Call
+        barrierPrice = vanillaPrice - barrierOptionPrice(S, K, H, T, r, q, sigma, true, true, 0);
       }
     } else {
-      // Up-and-out call (barrière au-dessus du strike)
-      if (isKnockOut && spotPrice >= barrier) {
-        barrierPrice = 0; // Déjà knocké
-      } else if (isKnockOut) {
-        barrierPrice = vanillaPrice; // Approximation pour up-and-out
+      // Up-and-Out Call (H > K)
+      if (S >= H) {
+        barrierPrice = isKnockOut ? rebate : vanillaPrice;
       } else {
-        barrierPrice = vanillaPrice; // Knock-in pas encore activé
+        if (isKnockOut) {
+          const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+          const A = S * Math.exp(-q * T) * normalCDF(d1) - K * Math.exp(-r * T) * normalCDF(d2);
+          const B = S * Math.exp(-q * T) * normalCDF(y1) - K * Math.exp(-r * T) * normalCDF(y1 - sigma * Math.sqrt(T));
+          barrierPrice = A - B;
+        } else {
+          const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+          const B = S * Math.exp(-q * T) * normalCDF(y1) - K * Math.exp(-r * T) * normalCDF(y1 - sigma * Math.sqrt(T));
+          barrierPrice = B;
+        }
       }
     }
   } else {
-    if (barrier >= strikePrice) {
-      // Up-and-out put
-      const A = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(-x1) + 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(-x1 + volatility * Math.sqrt(timeToExpiry));
-      const B = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * normalCDF(-y1) + 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * normalCDF(-y1 + volatility * Math.sqrt(timeToExpiry));
-      const C = -spotPrice * Math.exp(-foreignRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda) * normalCDF(-y) + 
-               strikePrice * Math.exp(-domesticRate * timeToExpiry) * Math.pow(barrier / spotPrice, 2 * lambda - 2) * 
-               normalCDF(-y + volatility * Math.sqrt(timeToExpiry));
-
+    // Put options
+    if (H >= K) {
+      // Up-and-Out Put (H > K)
       if (isKnockOut) {
+        const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+        const x1 = (Math.log(S / H) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+        
+        const A = -S * Math.exp(-q * T) * normalCDF(-d1) + K * Math.exp(-r * T) * normalCDF(-d2);
+        const B = -S * Math.exp(-q * T) * normalCDF(-y1) + K * Math.exp(-r * T) * normalCDF(-y1 + sigma * Math.sqrt(T));
+        const C = -S * Math.exp(-q * T) * Math.pow(H / S, 2 * (r - q) / (sigma * sigma)) * normalCDF(-x1) +
+                  K * Math.exp(-r * T) * Math.pow(H / S, 2 * (r - q) / (sigma * sigma) - 2) * normalCDF(-x1 + sigma * Math.sqrt(T));
+
         barrierPrice = A - B - C;
       } else {
-        barrierPrice = B + C;
+        // Up-and-In Put
+        barrierPrice = vanillaPrice - barrierOptionPrice(S, K, H, T, r, q, sigma, false, true, 0);
       }
     } else {
-      // Down-and-out put (barrière en-dessous du strike)
-      if (isKnockOut && spotPrice <= barrier) {
-        barrierPrice = 0; // Déjà knocké
-      } else if (isKnockOut) {
-        barrierPrice = vanillaPrice; // Approximation pour down-and-out
+      // Down-and-Out Put (H < K)
+      if (S <= H) {
+        barrierPrice = isKnockOut ? rebate : vanillaPrice;
       } else {
-        barrierPrice = vanillaPrice; // Knock-in pas encore activé
+        if (isKnockOut) {
+          const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+          const A = -S * Math.exp(-q * T) * normalCDF(-d1) + K * Math.exp(-r * T) * normalCDF(-d2);
+          const B = -S * Math.exp(-q * T) * normalCDF(-y1) + K * Math.exp(-r * T) * normalCDF(-y1 + sigma * Math.sqrt(T));
+          barrierPrice = A - B;
+        } else {
+          const y1 = (Math.log(H / S) + (r - q + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+          const B = -S * Math.exp(-q * T) * normalCDF(-y1) + K * Math.exp(-r * T) * normalCDF(-y1 + sigma * Math.sqrt(T));
+          barrierPrice = B;
+        }
       }
     }
   }
 
-  return Math.max(0, barrierPrice + rebate * Math.exp(-domesticRate * timeToExpiry));
+  // Ajouter le rebate actualisé
+  const finalPrice = Math.max(0, barrierPrice) + rebate * Math.exp(-r * T);
+  
+  console.log('Barrier option result:', {
+    vanillaPrice,
+    barrierPrice,
+    finalPrice,
+    rebate
+  });
+
+  return finalPrice;
 }
 
 // Monte Carlo pour options digitales
@@ -405,6 +455,11 @@ export function calculateTheoreticalPrice(
           effectiveBarrier = spotRate * (instrument.barrier / 100);
         }
         const isKnockOut = instrument.type.includes('Knock-Out');
+        
+        console.log('Call barrier option params:', {
+          spotRate, effectiveStrike, effectiveBarrier, isKnockOut
+        });
+        
         theoreticalPrice = barrierOptionPrice(
           spotRate, effectiveStrike, effectiveBarrier, timeToExpiry,
           domesticRate, foreignRate, volatility, true, isKnockOut, instrument.rebate || 0
@@ -420,6 +475,11 @@ export function calculateTheoreticalPrice(
           effectiveBarrier = spotRate * (instrument.barrier / 100);
         }
         const isKnockOut = instrument.type.includes('Knock-Out');
+        
+        console.log('Put barrier option params:', {
+          spotRate, effectiveStrike, effectiveBarrier, isKnockOut
+        });
+        
         theoreticalPrice = barrierOptionPrice(
           spotRate, effectiveStrike, effectiveBarrier, timeToExpiry,
           domesticRate, foreignRate, volatility, false, isKnockOut, instrument.rebate || 0
