@@ -183,34 +183,48 @@ export function calculateMTM(
 
   const timeToExpiry = Math.max(0, (new Date(instrument.maturity).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24 * 365));
   const volatility = volatilities[`EUR${instrument.currency}`] || 0.15;
+  const spotRate = currentRates[`EUR${instrument.currency}`] || 1;
 
   console.log('Calculating MTM for:', instrument.type, instrument.currency, 'TTM:', timeToExpiry);
 
+  // Calcul du strike effectif (en tenant compte du type)
+  let effectiveStrike = instrument.rate;
+  if (instrument.strikeType === 'percentage') {
+    effectiveStrike = spotRate * (instrument.rate / 100);
+  }
+
+  // Calcul des barrières effectives
+  let effectiveBarrier = instrument.barrier;
+  let effectiveLowerBarrier = instrument.lowerBarrier;
+  let effectiveUpperBarrier = instrument.upperBarrier;
+
+  if (instrument.barrierType === 'percentage' && spotRate) {
+    if (effectiveBarrier) effectiveBarrier = spotRate * (instrument.barrier / 100);
+    if (effectiveLowerBarrier) effectiveLowerBarrier = spotRate * (instrument.lowerBarrier / 100);
+    if (effectiveUpperBarrier) effectiveUpperBarrier = spotRate * (instrument.upperBarrier / 100);
+  }
+
   switch (instrument.type) {
     case 'Forward':
-      const forwardRate = currentRates[`EUR${instrument.currency}`] || 1;
-      const mtmForward = instrument.amount * (forwardRate - instrument.rate);
-      console.log('Forward MTM:', mtmForward, 'Current rate:', forwardRate, 'Strike:', instrument.rate);
+      const mtmForward = instrument.amount * (spotRate - effectiveStrike);
+      console.log('Forward MTM:', mtmForward, 'Current rate:', spotRate, 'Strike:', effectiveStrike);
       return mtmForward;
 
-    case 'Option Call':
-    case 'Option Put':
-      const spotRate = currentRates[`EUR${instrument.currency}`] || 1;
-      const isCall = instrument.type === 'Option Call';
+    case 'Call':
+    case 'Put':
+      const isCall = instrument.type === 'Call';
       
       if (timeToExpiry <= 0) {
-        // Option expirée - valeur intrinsèque
         const intrinsicValue = Math.max(0, isCall ? 
-          (spotRate - instrument.rate) * instrument.amount : 
-          (instrument.rate - spotRate) * instrument.amount);
+          (spotRate - effectiveStrike) * instrument.amount : 
+          (effectiveStrike - spotRate) * instrument.amount);
         const premiumPaid = instrument.premium || 0;
-        console.log('Expired option MTM:', intrinsicValue - premiumPaid);
         return intrinsicValue - premiumPaid;
       }
       
       const optionValue = blackScholesPrice(
         spotRate,
-        instrument.rate,
+        effectiveStrike,
         timeToExpiry,
         riskFreeRate,
         volatility,
@@ -222,17 +236,149 @@ export function calculateMTM(
       console.log('Option MTM:', mtmOption, 'Option value:', optionValue, 'Premium paid:', premiumPaid);
       return mtmOption;
 
+    // Instruments à barrière
+    case 'Call Knock-Out':
+    case 'Put Knock-Out':
+    case 'Call Knock-In':
+    case 'Put Knock-In':
+      return calculateBarrierOptionMTM(instrument, spotRate, effectiveStrike, effectiveBarrier, timeToExpiry, riskFreeRate, volatility);
+
+    // Instruments à double barrière
+    case 'Call Double Knock-Out':
+    case 'Put Double Knock-Out':
+    case 'Call Double Knock-In':
+    case 'Put Double Knock-In':
+      return calculateDoubleBarrierOptionMTM(instrument, spotRate, effectiveStrike, effectiveLowerBarrier, effectiveUpperBarrier, timeToExpiry, riskFreeRate, volatility);
+
+    // Instruments Touch
+    case 'One Touch (beta)':
+    case 'No Touch (beta)':
+      return calculateTouchOptionMTM(instrument, spotRate, effectiveBarrier, timeToExpiry, riskFreeRate, volatility);
+
+    case 'Double Touch (beta)':
+    case 'Double No Touch (beta)':
+      return calculateDoubleTouchOptionMTM(instrument, spotRate, effectiveLowerBarrier, effectiveUpperBarrier, timeToExpiry, riskFreeRate, volatility);
+
+    // Instruments binaires
+    case 'Range Binary (beta)':
+    case 'Outside Binary (beta)':
+      return calculateBinaryOptionMTM(instrument, spotRate, effectiveLowerBarrier, effectiveUpperBarrier, timeToExpiry, riskFreeRate, volatility);
+
     case 'Swap':
-      // Calcul simplifié pour un swap
-      const swapRate = currentRates[`EUR${instrument.currency}`] || 1;
-      const mtmSwap = instrument.amount * (swapRate - instrument.rate) * timeToExpiry;
+      const mtmSwap = instrument.amount * (spotRate - effectiveStrike) * timeToExpiry;
       console.log('Swap MTM:', mtmSwap);
       return mtmSwap;
 
     default:
       console.log('Unknown instrument type, using random MTM');
-      return Math.random() * 10000 - 5000; // Simulation pour autres instruments
+      return Math.random() * 10000 - 5000;
   }
+}
+
+// Fonction pour calculer le MTM des options à barrière simple
+function calculateBarrierOptionMTM(instrument: any, spot: number, strike: number, barrier: number, timeToExpiry: number, riskFreeRate: number, volatility: number): number {
+  if (timeToExpiry <= 0) return 0;
+
+  const isCall = instrument.type.includes('Call');
+  const isKnockIn = instrument.type.includes('Knock-In');
+  
+  // Approximation simplifiée pour les options barrière
+  const vanillaPrice = blackScholesPrice(spot, strike, timeToExpiry, riskFreeRate, volatility, isCall);
+  
+  // Facteur de réduction basé sur la proximité de la barrière
+  const barrierDistance = Math.abs(spot - barrier) / spot;
+  const barrierFactor = isKnockIn ? (1 - Math.exp(-barrierDistance * 5)) : Math.exp(-barrierDistance * 5);
+  
+  const optionValue = vanillaPrice * barrierFactor;
+  const premiumPaid = instrument.premium || 0;
+  
+  return (optionValue * instrument.amount) - premiumPaid;
+}
+
+// Fonction pour calculer le MTM des options à double barrière
+function calculateDoubleBarrierOptionMTM(instrument: any, spot: number, strike: number, lowerBarrier: number, upperBarrier: number, timeToExpiry: number, riskFreeRate: number, volatility: number): number {
+  if (timeToExpiry <= 0) return 0;
+  
+  // Vérifier si le spot est dans la plage des barrières
+  const isInRange = spot > lowerBarrier && spot < upperBarrier;
+  const isKnockIn = instrument.type.includes('Knock-In');
+  
+  if (!isInRange && !isKnockIn) return 0; // Knock-out déjà activé
+  if (isInRange && isKnockIn) return 0; // Knock-in pas encore activé
+  
+  const isCall = instrument.type.includes('Call');
+  const vanillaPrice = blackScholesPrice(spot, strike, timeToExpiry, riskFreeRate, volatility, isCall);
+  
+  // Facteur de réduction pour double barrière
+  const rangeWidth = (upperBarrier - lowerBarrier) / spot;
+  const rangeFactor = Math.min(1, rangeWidth);
+  
+  const optionValue = vanillaPrice * rangeFactor;
+  const premiumPaid = instrument.premium || 0;
+  
+  return (optionValue * instrument.amount) - premiumPaid;
+}
+
+// Fonction pour calculer le MTM des options Touch
+function calculateTouchOptionMTM(instrument: any, spot: number, barrier: number, timeToExpiry: number, riskFreeRate: number, volatility: number): number {
+  if (timeToExpiry <= 0) return 0;
+  
+  const isOneTouch = instrument.type.includes('One Touch');
+  const hasHitBarrier = spot >= barrier; // Simplifié
+  
+  if (hasHitBarrier && isOneTouch) {
+    return instrument.amount - (instrument.premium || 0);
+  }
+  
+  if (hasHitBarrier && !isOneTouch) {
+    return -(instrument.premium || 0);
+  }
+  
+  // Probabilité simplifiée d'atteindre la barrière
+  const d = Math.log(barrier / spot) / (volatility * Math.sqrt(timeToExpiry));
+  const touchProbability = normalCDF(Math.abs(d));
+  
+  const expectedValue = isOneTouch ? touchProbability * instrument.amount : (1 - touchProbability) * instrument.amount;
+  const premiumPaid = instrument.premium || 0;
+  
+  return expectedValue - premiumPaid;
+}
+
+// Fonction pour calculer le MTM des options Double Touch
+function calculateDoubleTouchOptionMTM(instrument: any, spot: number, lowerBarrier: number, upperBarrier: number, timeToExpiry: number, riskFreeRate: number, volatility: number): number {
+  if (timeToExpiry <= 0) return 0;
+  
+  const isDoubleTouch = instrument.type.includes('Double Touch');
+  const hasHitLower = spot <= lowerBarrier;
+  const hasHitUpper = spot >= upperBarrier;
+  const hasHitEither = hasHitLower || hasHitUpper;
+  
+  if (hasHitEither && isDoubleTouch) {
+    return instrument.amount - (instrument.premium || 0);
+  }
+  
+  // Estimation simplifiée
+  const expectedValue = isDoubleTouch ? 0.3 * instrument.amount : 0.7 * instrument.amount;
+  const premiumPaid = instrument.premium || 0;
+  
+  return expectedValue - premiumPaid;
+}
+
+// Fonction pour calculer le MTM des options binaires
+function calculateBinaryOptionMTM(instrument: any, spot: number, lowerBarrier: number, upperBarrier: number, timeToExpiry: number, riskFreeRate: number, volatility: number): number {
+  if (timeToExpiry <= 0) return 0;
+  
+  const isRange = instrument.type.includes('Range');
+  const isInRange = spot > lowerBarrier && spot < upperBarrier;
+  
+  // Pour les options binaires, le payout est fixe
+  const payout = instrument.amount;
+  const probability = isRange ? (isInRange ? 0.6 : 0.4) : (isInRange ? 0.4 : 0.6);
+  
+  const expectedValue = probability * payout;
+  const premiumPaid = instrument.premium || 0;
+  
+  return expectedValue - premiumPaid;
 }
 
 // Calcul des sensibilités (Greeks) pour une option

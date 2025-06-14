@@ -11,6 +11,16 @@ interface HedgingInstrument {
   maturity: string;
   premium?: number;
   mtm: number;
+  barrier?: number;
+  barrierType?: 'percentage' | 'absolute';
+  strikeType?: 'percentage' | 'absolute';
+  knockDirection?: 'in' | 'out';
+  barrierDirection?: 'up' | 'down';
+  isReverse?: boolean;
+  isDouble?: boolean;
+  lowerBarrier?: number;
+  upperBarrier?: number;
+  rebate?: number;
 }
 
 interface HedgingContextType {
@@ -36,9 +46,9 @@ interface HedgingProviderProps {
 
 export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) => {
   const [hedgingInstruments, setHedgingInstruments] = useState<HedgingInstrument[]>([
-    { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-07-15', mtm: 2500 },
-    { id: 2, type: 'Option Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800 },
-    { id: 3, type: 'Forward', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-08-10', mtm: 1800 },
+    { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-07-15', mtm: 2500, strikeType: 'absolute' },
+    { id: 2, type: 'Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800, strikeType: 'absolute' },
+    { id: 3, type: 'Call Knock-Out', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-08-10', premium: 800, barrier: 165.00, barrierType: 'absolute', strikeType: 'absolute', mtm: 1800 },
   ]);
 
   const addHedgingInstrument = (instrumentData: Omit<HedgingInstrument, 'id' | 'mtm'>) => {
