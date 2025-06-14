@@ -26,6 +26,8 @@ interface HedgingInstrument {
   lowerBarrier?: number;
   upperBarrier?: number;
   rebate?: number;
+  impliedVolatility?: number;
+  riskFreeRate?: number;
 }
 
 interface AddHedgingDialogProps {
@@ -50,7 +52,9 @@ export function AddHedgingDialog({ onAddHedging }: AddHedgingDialogProps) {
     isDouble: false,
     lowerBarrier: '',
     upperBarrier: '',
-    rebate: ''
+    rebate: '',
+    impliedVolatility: '',
+    riskFreeRate: ''
   });
 
   const instrumentTypes = [
@@ -101,6 +105,15 @@ export function AddHedgingDialog({ onAddHedging }: AddHedgingDialogProps) {
         instrumentData.premium = parseFloat(formData.premium);
       }
 
+      // Ajouter volatilité implicite et taux d'intérêt pour les options
+      if (isOption && formData.impliedVolatility) {
+        instrumentData.impliedVolatility = parseFloat(formData.impliedVolatility) / 100; // Convertir % en décimal
+      }
+
+      if (isOption && formData.riskFreeRate) {
+        instrumentData.riskFreeRate = parseFloat(formData.riskFreeRate) / 100; // Convertir % en décimal
+      }
+
       if (isBarrierInstrument) {
         instrumentData.barrierType = formData.barrierType;
         
@@ -121,7 +134,7 @@ export function AddHedgingDialog({ onAddHedging }: AddHedgingDialogProps) {
         type: '', currency: '', amount: '', rate: '', maturity: '', premium: '',
         barrier: '', barrierType: 'percentage', strikeType: 'percentage',
         knockDirection: 'out', barrierDirection: 'up', isReverse: false, isDouble: false,
-        lowerBarrier: '', upperBarrier: '', rebate: ''
+        lowerBarrier: '', upperBarrier: '', rebate: '', impliedVolatility: '', riskFreeRate: ''
       });
       setOpen(false);
     }
@@ -280,6 +293,34 @@ export function AddHedgingDialog({ onAddHedging }: AddHedgingDialogProps) {
                 onChange={(e) => setFormData({...formData, premium: e.target.value})}
                 placeholder="5000"
               />
+            </div>
+          )}
+
+          {/* Champs spécifiques aux options pour volatilité implicite et taux */}
+          {isOption && (
+            <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border">
+              <div>
+                <Label htmlFor="impliedVolatility">Volatilité implicite (%)</Label>
+                <Input
+                  id="impliedVolatility"
+                  type="number"
+                  step="0.01"
+                  value={formData.impliedVolatility}
+                  onChange={(e) => setFormData({...formData, impliedVolatility: e.target.value})}
+                  placeholder="15.50"
+                />
+              </div>
+              <div>
+                <Label htmlFor="riskFreeRate">Taux sans risque (%)</Label>
+                <Input
+                  id="riskFreeRate"
+                  type="number"
+                  step="0.01"
+                  value={formData.riskFreeRate}
+                  onChange={(e) => setFormData({...formData, riskFreeRate: e.target.value})}
+                  placeholder="2.00"
+                />
+              </div>
             </div>
           )}
 

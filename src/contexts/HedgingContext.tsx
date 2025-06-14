@@ -21,6 +21,8 @@ interface HedgingInstrument {
   lowerBarrier?: number;
   upperBarrier?: number;
   rebate?: number;
+  impliedVolatility?: number;
+  riskFreeRate?: number;
 }
 
 interface HedgingContextType {
@@ -49,8 +51,8 @@ export const HedgingProvider: React.FC<HedgingProviderProps> = ({ children }) =>
   const [lastUpdated, setLastUpdated] = useState(Date.now());
   const [hedgingInstruments, setHedgingInstruments] = useState<HedgingInstrument[]>([
     { id: 1, type: 'Forward', currency: 'USD', amount: 500000, rate: 1.0800, maturity: '2024-07-15', mtm: 2500, strikeType: 'absolute' },
-    { id: 2, type: 'Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800, strikeType: 'absolute' },
-    { id: 3, type: 'Call Knock-Out', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-08-10', premium: 800, barrier: 165.00, barrierType: 'absolute', strikeType: 'absolute', mtm: 1800 },
+    { id: 2, type: 'Put', currency: 'GBP', amount: 300000, rate: 0.8500, maturity: '2024-06-28', premium: 1200, mtm: -800, strikeType: 'absolute', impliedVolatility: 0.12, riskFreeRate: 0.02 },
+    { id: 3, type: 'Call Knock-Out', currency: 'JPY', amount: 200000, rate: 160.00, maturity: '2024-08-10', premium: 800, barrier: 165.00, barrierType: 'absolute', strikeType: 'absolute', mtm: 1800, impliedVolatility: 0.15, riskFreeRate: 0.025 },
   ]);
 
   const addHedgingInstrument = (instrumentData: Omit<HedgingInstrument, 'id' | 'mtm'>) => {
