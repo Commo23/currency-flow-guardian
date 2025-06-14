@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +7,9 @@ import { useHedging } from "@/contexts/HedgingContext";
 import { useMarketData } from "@/contexts/MarketDataContext";
 import { AddHedgingDialog } from "@/components/AddHedgingDialog";
 import { GreeksDisplay } from "@/components/GreeksDisplay";
+import { MarketDataSettings } from "@/components/MarketDataSettings";
 import { calculateMTM, calculateTheoreticalPrice } from "@/utils/financialCalculations";
-import { Shield, TrendingUp, Calendar, Edit, Trash2, Eye, BarChart3, DollarSign } from "lucide-react";
+import { Shield, TrendingUp, Calendar, Edit, Trash2, Eye, BarChart3, DollarSign, Settings } from "lucide-react";
 
 export default function Hedging() {
   const { t } = useLanguage();
@@ -17,6 +17,7 @@ export default function Hedging() {
   const { marketData } = useMarketData();
   const [selectedInstrument, setSelectedInstrument] = useState<number | null>(null);
   const [filter, setFilter] = useState('All');
+  const [showMarketSettings, setShowMarketSettings] = useState(false);
 
   const totalNotional = hedgingInstruments.reduce((sum, inst) => sum + Math.abs(inst.amount), 0);
   const totalMTM = hedgingInstruments.reduce((sum, inst) => sum + inst.mtm, 0);
@@ -113,6 +114,14 @@ export default function Hedging() {
             </p>
           </div>
           <Button 
+            variant="outline"
+            onClick={() => setShowMarketSettings(!showMarketSettings)}
+            className="bg-white/90 backdrop-blur-md shadow-lg hover:shadow-xl transition-all duration-300"
+          >
+            <Settings className="h-4 w-4 mr-2" />
+            Données de Marché
+          </Button>
+          <Button 
             className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             onClick={() => {
               // Trigger recalculation of all MTM
@@ -125,6 +134,11 @@ export default function Hedging() {
           <AddHedgingDialog onAddHedging={addHedgingInstrument} />
         </div>
       </div>
+
+      {/* Market Data Settings */}
+      {showMarketSettings && (
+        <MarketDataSettings />
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -242,11 +256,11 @@ export default function Hedging() {
                     {filteredInstruments.map((instrument, index) => {
                       const ttm = getTimeToMaturity(instrument.maturity);
                       const effectiveness = getEffectiveness(instrument);
-                      const volatility = getVolatility(instrument.currency);
+                      const volatility = (marketData.volatilities[`EUR${instrument.currency}`] || 0.15) * 100;
                       const spotRate = marketData.spotRates[`EUR${instrument.currency}`] || 1;
                       const riskFreeRate = marketData.riskFreeRate;
                       
-                      // Calculate theoretical price per unit (not total)
+                      // Calculate theoretical price per unit using market data
                       const theoreticalPriceTotal = calculateTheoreticalPrice(instrument, {
                         spotRates: marketData.spotRates,
                         volatilities: marketData.volatilities,
@@ -297,8 +311,8 @@ export default function Hedging() {
                             {theoreticalPricePerUnit.toFixed(6)}
                           </td>
                           <td className="p-3">{ttm}d</td>
-                          <td className="p-3">{volatility.toFixed(1)}%</td>
-                          <td className="p-3">{(riskFreeRate * 100).toFixed(2)}%</td>
+                          <td className="p-3 font-semibold text-orange-600">{volatility.toFixed(1)}%</td>
+                          <td className="p-3 font-semibold text-blue-600">{(riskFreeRate * 100).toFixed(2)}%</td>
                           <td className="p-3">
                             <div className="flex items-center space-x-2">
                               <div className="w-16 bg-slate-200 rounded-full h-2">
